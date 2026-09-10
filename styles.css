@@ -9,15 +9,9 @@ body.gate-activo .sidebar,body.gate-activo .mobile-menu-toggle,body.gate-activo 
 .acceso-gate-section{text-align:left;margin-bottom:8px}
 .acceso-gate-label{display:block;font-size:11px;font-weight:900;color:var(--blue);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
 .acceso-gate-row{display:grid;gap:10px;margin-bottom:12px}
-.acceso-gate-row input,.acceso-gate-field select{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:14px;font-family:inherit}
-.acceso-gate-field{display:block;margin-bottom:12px}
+.acceso-gate-row input{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:14px;font-family:inherit}
 .acceso-gate-primary{width:100%;background:var(--blue);color:#fff;border:0;border-radius:10px;padding:13px;font-weight:900;font-size:14px;cursor:pointer}
 .acceso-gate-primary:hover{background:#0f1fd6}
-.acceso-gate-secondary{width:100%;background:#eef2ff;color:var(--blue);border:1px solid #c7d0ee;border-radius:10px;padding:13px;font-weight:900;font-size:14px;cursor:pointer}
-.acceso-gate-secondary:hover{background:#dfe6ff}
-.acceso-gate-link{display:block;width:100%;text-align:center;background:none;border:0;color:var(--muted);font-size:12.5px;font-weight:700;cursor:pointer;margin:18px 0 4px;padding:6px;text-decoration:underline;text-underline-offset:3px}
-.acceso-gate-link:hover{color:var(--blue)}
-#gate-tecnico-section{margin-top:14px;padding-top:16px;border-top:1px solid var(--line)}
 .gate-error{background:#fdeaea;color:#b42318;border-radius:10px;padding:10px 12px;font-size:13px;font-weight:700;margin:-8px 0 16px}
 .gate-error.hidden{display:none}
 .input-icon{position:relative}
@@ -64,7 +58,9 @@ body.vista-qr .app{padding-top:24px!important}
 .lubricantes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:16px}
 .lubricante-card{position:relative;display:flex;gap:14px;align-items:flex-start;border:1px solid var(--line);border-radius:16px;background:#fff;padding:18px;cursor:pointer;transition:box-shadow .15s ease,border-color .15s ease,transform .15s ease}
 .lubricante-card:hover{border-color:var(--blue);box-shadow:0 16px 34px rgba(8,17,45,.12);transform:translateY(-2px)}
-.lubricante-card-icon{flex:0 0 auto;width:56px;height:56px;border-radius:14px;display:grid;place-items:center;font-size:26px;background:#eef2ff}
+.lubricante-card-icon{flex:0 0 auto;width:56px;height:56px;border-radius:14px;display:grid;place-items:center;font-size:26px;background:#eef2ff;overflow:hidden}
+.lubricante-card-icon.has-photo,.lube-detail-icon.has-photo{background:#fff;border:1px solid var(--line)}
+.lubricante-card-icon img,.lube-detail-icon img{width:100%;height:100%;object-fit:contain;padding:4px}
 .lubricante-card-icon.lube-grasa{background:#eef2ff}
 .lubricante-card-icon.lube-aceite{background:#fff4e0}
 .lubricante-card-icon.lube-otro{background:#f1f2fb}

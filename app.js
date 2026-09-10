@@ -388,11 +388,6 @@ async function logoutAuth() {
 }
 
 function mostrarGateAcceso() {
-  const gateEmpresa = $("gate-empresa-select");
-  if (gateEmpresa) {
-    gateEmpresa.innerHTML = $("empresa-select")?.innerHTML || "";
-    gateEmpresa.value = state.empresaId;
-  }
   if ($("gate-year")) $("gate-year").textContent = new Date().getFullYear();
   document.body.classList.add("gate-activo");
   $("acceso-gate")?.classList.remove("hidden");
@@ -410,16 +405,6 @@ function toggleGatePassword() {
   const oculto = input.type === "password";
   input.type = oculto ? "text" : "password";
   btn.textContent = oculto ? "🙈" : "👁";
-}
-
-function toggleGateTecnico(forzar) {
-  const section = $("gate-tecnico-section");
-  const link = $("gate-tecnico-link");
-  if (!section) return;
-  const abrir = typeof forzar === "boolean" ? forzar : section.classList.contains("hidden");
-  section.classList.toggle("hidden", !abrir);
-  if (link) link.textContent = abrir ? "Ya tengo cuenta, iniciar sesión con correo" : "¿Eres técnico y no tienes cuenta? Entra por rol y empresa";
-  if (link) link.onclick = () => toggleGateTecnico(!abrir);
 }
 
 function roleLabel(value) {
@@ -759,10 +744,20 @@ async function guardarLubricante() {
   const marca = $("lub-marca")?.value.trim();
   const especificacion = $("lub-especificacion")?.value.trim();
   const nota = $("lub-nota")?.value.trim();
+  const foto = $("lub-foto")?.files?.[0];
   const ficha = $("lub-ficha")?.files?.[0];
 
   if (!nombre) {
     mostrarAvisoFlotante("Escribe el nombre del lubricante antes de guardar.", "error");
+    return;
+  }
+
+  if (foto && !foto.type.startsWith("image/")) {
+    mostrarAvisoFlotante("La foto del producto debe ser una imagen.", "error");
+    return;
+  }
+  if (foto && foto.size > 4500000) {
+    mostrarAvisoFlotante("Esa foto pesa demasiado, usa una menor a 4.5 MB.", "error");
     return;
   }
 
@@ -779,6 +774,13 @@ async function guardarLubricante() {
   const editandoId = state.editandoLubricanteId;
   const editando = editandoId ? state.lubricantes.find(item => String(item.id) === String(editandoId)) : null;
 
+  let fotoDataUrl = editando?.foto_producto_data_url || null;
+  let fotoNombre = editando?.foto_producto_nombre || null;
+  if (foto) {
+    fotoDataUrl = await fileToDataUrl(foto);
+    fotoNombre = foto.name;
+  }
+
   let fichaDataUrl = editando?.ficha_tecnica_data_url || null;
   let fichaNombre = editando?.ficha_tecnica_nombre || null;
   let fichaTipo = editando?.ficha_tecnica_tipo || null;
@@ -794,6 +796,8 @@ async function guardarLubricante() {
     marca: marca || null,
     especificacion: especificacion || null,
     nota: nota || null,
+    foto_producto_nombre: fotoNombre,
+    foto_producto_data_url: fotoDataUrl,
     ficha_tecnica_nombre: fichaNombre,
     ficha_tecnica_tipo: fichaTipo,
     ficha_tecnica_data_url: fichaDataUrl
@@ -804,11 +808,13 @@ async function guardarLubricante() {
     : await sb.from(cfg.tables.lubricantes).insert({ ...payload, empresa_id: state.empresaId });
 
   if (error) {
-    mostrarAvisoFlotante(`No se pudo guardar el lubricante: ${error.message}. Corre el Paso 22/23 si aún no los has corrido.`, "error");
+    mostrarAvisoFlotante(`No se pudo guardar el lubricante: ${error.message}. Corre el Paso 22/23/25 si aún no los has corrido.`, "error");
     return;
   }
 
   ["lub-nombre", "lub-marca", "lub-especificacion", "lub-nota"].forEach(id => { if ($(id)) $(id).value = ""; });
+  if ($("lub-foto")) $("lub-foto").value = "";
+  if ($("lub-foto-preview")) $("lub-foto-preview").innerHTML = "";
   if ($("lub-ficha")) $("lub-ficha").value = "";
   if ($("lub-ficha-preview")) $("lub-ficha-preview").innerHTML = "";
   state.editandoLubricanteId = "";
@@ -839,6 +845,23 @@ function toggleLubricanteForm() {
   renderModules();
 }
 
+function previewFotoProductoLubricante(input) {
+  const preview = $("lub-foto-preview");
+  const file = input?.files?.[0];
+  if (!preview || !file) return;
+
+  if (!file.type.startsWith("image/")) {
+    preview.innerHTML = `<div class="empty-state small">Selecciona una imagen.</div>`;
+    return;
+  }
+  if (file.size > 4500000) {
+    preview.innerHTML = `<div class="empty-state small">Esa foto pesa demasiado, usa una menor a 4.5 MB.</div>`;
+    return;
+  }
+  const url = URL.createObjectURL(file);
+  preview.innerHTML = `<div class="closure-photo"><img src="${url}" alt="Vista previa"></div>`;
+}
+
 function previewFichaLubricante(input) {
   const preview = $("lub-ficha-preview");
   const file = input?.files?.[0];
@@ -865,6 +888,13 @@ function lubricanteVisual(tipo) {
   if (t.startsWith("grasa")) return { icon: "🧴", clase: "lube-grasa" };
   if (t.startsWith("aceite")) return { icon: "🛢️", clase: "lube-aceite" };
   return { icon: "⚙️", clase: "lube-otro" };
+}
+
+function lubricanteIconHtml(l, visual) {
+  if (l.foto_producto_data_url) {
+    return `<img src="${escapeHtml(l.foto_producto_data_url)}" alt="${escapeHtml(l.nombre)}">`;
+  }
+  return visual.icon;
 }
 
 function usoLubricante(lubricante) {
@@ -896,7 +926,7 @@ function renderPanelLubricante() {
 
   return `
     <div class="lube-detail-hero">
-      <div class="lube-detail-icon ${visual.clase}">${visual.icon}</div>
+      <div class="lube-detail-icon ${visual.clase} ${l.foto_producto_data_url ? "has-photo" : ""}">${lubricanteIconHtml(l, visual)}</div>
       <div class="lube-detail-heading">
         <span class="lube-detail-brand">${escapeHtml(l.marca || "MOLUB")}</span>
         <h2>${escapeHtml(l.nombre)}</h2>
@@ -3037,7 +3067,7 @@ function renderModules() {
           const visual = lubricanteVisual(l.tipo);
           return `
           <article class="lubricante-card" onclick="seleccionarLubricante('${escapeHtml(l.id)}')">
-            <div class="lubricante-card-icon ${visual.clase}">${visual.icon}</div>
+            <div class="lubricante-card-icon ${visual.clase} ${l.foto_producto_data_url ? "has-photo" : ""}">${lubricanteIconHtml(l, visual)}</div>
             <div class="lubricante-card-body">
               <span class="lubricante-card-tipo">${escapeHtml(l.tipo || "Grasa")}</span>
               <strong>${escapeHtml(l.nombre)}</strong>
@@ -3076,8 +3106,14 @@ function renderModules() {
                   </div>
                   <label>Especificación<input id="lub-especificacion" placeholder="Ej: ISO 220, NLGI 2..." value="${escapeHtml(editando?.especificacion || "")}"></label>
                   <label>Nota<textarea id="lub-nota" placeholder="Uso recomendado, equivalencias, observaciones...">${escapeHtml(editando?.nota || "")}</textarea></label>
-                  <label>Ficha técnica o presentación (PDF o imagen)<input id="lub-ficha" type="file" accept="application/pdf,image/*" onchange="previewFichaLubricante(this)"></label>
-                  <div id="lub-ficha-preview">${editando?.ficha_tecnica_nombre ? `<div class="closure-photo"><small>📎 Ya tiene: ${escapeHtml(editando.ficha_tecnica_nombre)} (sube otro archivo para reemplazarla)</small></div>` : ""}</div>
+                  <div class="two-cols">
+                    <label>Foto del producto (imagen)<input id="lub-foto" type="file" accept="image/*" onchange="previewFotoProductoLubricante(this)"></label>
+                    <label>Ficha técnica (PDF o imagen)<input id="lub-ficha" type="file" accept="application/pdf,image/*" onchange="previewFichaLubricante(this)"></label>
+                  </div>
+                  <div class="two-cols">
+                    <div id="lub-foto-preview">${editando?.foto_producto_data_url ? `<div class="closure-photo"><img src="${escapeHtml(editando.foto_producto_data_url)}" alt="Foto actual"><small>Sube otra imagen para reemplazarla</small></div>` : ""}</div>
+                    <div id="lub-ficha-preview">${editando?.ficha_tecnica_nombre ? `<div class="closure-photo"><small>📎 Ya tiene: ${escapeHtml(editando.ficha_tecnica_nombre)} (sube otro archivo para reemplazarla)</small></div>` : ""}</div>
+                  </div>
                   <div class="form-action">
                     ${editando ? `<button class="ghost-action" onclick="cancelarEdicionLubricante()">Cancelar</button>` : ""}
                     <button onclick="guardarLubricante()">${editando ? "Guardar cambios" : "Dar de alta"}</button>
@@ -3476,24 +3512,6 @@ $("gate-password")?.addEventListener("keydown", (event) => {
   if (event.key === "Enter") intentarLoginDesdeGate();
 });
 
-$("gate-continue-btn")?.addEventListener("click", async () => {
-  const rol = $("gate-role-select")?.value || "SUPERVISOR";
-  const empresaId = $("gate-empresa-select")?.value || "";
-  if (!empresaId) {
-    mostrarErrorGate("Selecciona una empresa antes de continuar.");
-    return;
-  }
-  ocultarErrorGate();
-  state.sessionRole = rol;
-  state.empresaId = empresaId;
-  if ($("role-select")) $("role-select").value = rol;
-  if ($("empresa-select")) $("empresa-select").value = empresaId;
-  ocultarGateAcceso();
-  setStatus("Cargando equipos de la empresa seleccionada...");
-  await loadEquipos();
-  const empresaNombre = activeEmpresa()?.nombre || "tu empresa";
-  mostrarAvisoFlotante(`Acceso por rol: ${roleLabel(rol)} · ${empresaNombre}`, "ok");
-});
 
 sb.auth.onAuthStateChange((_event, session) => {
   applyAuthSession(session, !bootstrapping).catch(err => {
