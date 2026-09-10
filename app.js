@@ -285,12 +285,12 @@ function renderAuthPanel() {
       ? `Sesión real: ${authDisplayName()}`
       : logged
         ? "Sesión activa sin perfil vinculado. Revisa el Paso 19."
-        : "Modo laboratorio activo.";
+        : "Acceso por rol activo.";
     msg.style.color = locked ? "var(--green)" : "var(--muted)";
   }
 
   const sessionBox = document.querySelector(".session span");
-  if (sessionBox) sessionBox.textContent = locked ? "Sesión real" : "Modo laboratorio";
+  if (sessionBox) sessionBox.textContent = locked ? "Sesión activa" : "Acceso por rol";
   syncAuthLockedControls();
 }
 
@@ -391,6 +391,7 @@ function mostrarGateAcceso() {
     gateEmpresa.innerHTML = $("empresa-select")?.innerHTML || "";
     gateEmpresa.value = state.empresaId;
   }
+  if ($("gate-year")) $("gate-year").textContent = new Date().getFullYear();
   document.body.classList.add("gate-activo");
   $("acceso-gate")?.classList.remove("hidden");
 }
@@ -398,6 +399,15 @@ function mostrarGateAcceso() {
 function ocultarGateAcceso() {
   document.body.classList.remove("gate-activo");
   $("acceso-gate")?.classList.add("hidden");
+}
+
+function toggleGatePassword() {
+  const input = $("gate-password");
+  const btn = $("gate-password-toggle");
+  if (!input || !btn) return;
+  const oculto = input.type === "password";
+  input.type = oculto ? "text" : "password";
+  btn.textContent = oculto ? "🙈" : "👁";
 }
 
 function mostrarErrorGate(mensaje) {
@@ -787,24 +797,43 @@ function seleccionarLubricante(id) {
   abrirModal(renderPanelLubricante());
 }
 
+function lubricanteVisual(tipo) {
+  const t = String(tipo || "").toLowerCase();
+  if (t.startsWith("grasa")) return { icon: "🧴", clase: "lube-grasa" };
+  if (t.startsWith("aceite")) return { icon: "🛢️", clase: "lube-aceite" };
+  return { icon: "⚙️", clase: "lube-otro" };
+}
+
 function renderPanelLubricante() {
   const l = state.lubricantes.find(item => String(item.id) === String(state.selectedLubricanteId));
   if (!l) return `<div class="empty-state">Selecciona un lubricante.</div>`;
+  const visual = lubricanteVisual(l.tipo);
+  const tieneFicha = Boolean(l.ficha_tecnica_data_url);
+  const fichaEsImagen = String(l.ficha_tecnica_tipo || "").startsWith("image/");
+
   return `
-    <div class="panel-head compact-head">
-      <h3>${escapeHtml(l.nombre)}</h3>
-      <span class="status-pill">${escapeHtml(l.tipo || "Grasa")}</span>
+    <div class="lube-detail-hero">
+      <div class="lube-detail-icon ${visual.clase}">${visual.icon}</div>
+      <div class="lube-detail-heading">
+        <span class="lube-detail-brand">${escapeHtml(l.marca || "MOLUB")}</span>
+        <h2>${escapeHtml(l.nombre)}</h2>
+        <div class="lube-detail-badges">
+          <span class="status-pill">${escapeHtml(l.tipo || "Grasa")}</span>
+          ${l.especificacion ? `<span class="pill">${escapeHtml(l.especificacion)}</span>` : ""}
+        </div>
+      </div>
     </div>
-    <div class="detail-grid">
-      ${campoDetalle("Marca", l.marca || "-")}
-      ${campoDetalle("Especificación", l.especificacion || "-")}
+    <div class="lube-stats">
+      <div class="lube-stat"><span>🏷️ Marca</span><strong>${escapeHtml(l.marca || "Sin marca")}</strong></div>
+      <div class="lube-stat"><span>🧪 Tipo</span><strong>${escapeHtml(l.tipo || "Grasa")}</strong></div>
+      <div class="lube-stat"><span>📐 Especificación</span><strong>${escapeHtml(l.especificacion || "Sin especificar")}</strong></div>
     </div>
     ${l.nota ? `<div class="detail-section-title">🗒 Nota</div><div class="detail-text">${escapeHtml(l.nota)}</div>` : ""}
-    ${l.ficha_tecnica_data_url ? `
+    ${tieneFicha ? `
       <div class="detail-section-title">📎 Ficha técnica / presentación</div>
-      ${String(l.ficha_tecnica_tipo || "").startsWith("image/")
+      ${fichaEsImagen
         ? `<div class="detail-photos"><img src="${escapeHtml(l.ficha_tecnica_data_url)}" alt="${escapeHtml(l.ficha_tecnica_nombre || "Ficha técnica")}" onclick="window.open(this.src, '_blank')"></div>`
-        : `<a class="ghost-action" style="display:inline-block;text-decoration:none" href="${escapeHtml(l.ficha_tecnica_data_url)}" target="_blank" rel="noopener">Ver ${escapeHtml(l.ficha_tecnica_nombre || "ficha técnica (PDF)")}</a>`}
+        : `<a class="lube-file-chip" href="${escapeHtml(l.ficha_tecnica_data_url)}" target="_blank" rel="noopener"><span>📄</span>${escapeHtml(l.ficha_tecnica_nombre || "Ver ficha técnica (PDF)")}</a>`}
     ` : ""}
     <div class="modal-actions">
       <button class="ghost-action" onclick="cerrarModal()">Cerrar</button>
@@ -2944,16 +2973,20 @@ function renderModules() {
       }
       if (id === "lubricantes") {
         const lubricantes = lubricantesFiltrados();
-        const lubricantesHtml = lubricantes.length ? lubricantes.map(l => `
-          <article class="activity-row clickable" onclick="seleccionarLubricante('${escapeHtml(l.id)}')">
-            <div>
+        const lubricantesHtml = lubricantes.length ? lubricantes.map(l => {
+          const visual = lubricanteVisual(l.tipo);
+          return `
+          <article class="lubricante-card" onclick="seleccionarLubricante('${escapeHtml(l.id)}')">
+            <div class="lubricante-card-icon ${visual.clase}">${visual.icon}</div>
+            <div class="lubricante-card-body">
+              <span class="lubricante-card-tipo">${escapeHtml(l.tipo || "Grasa")}</span>
               <strong>${escapeHtml(l.nombre)}</strong>
-              <span>${escapeHtml(l.marca || "Sin marca")} ${l.especificacion ? `- ${escapeHtml(l.especificacion)}` : ""}</span>
-              ${l.nota ? `<small>${escapeHtml(l.nota)}</small>` : ""}
+              <span class="lubricante-card-marca">${escapeHtml(l.marca || "Sin marca")}</span>
+              ${l.especificacion ? `<span class="lubricante-card-spec">${escapeHtml(l.especificacion)}</span>` : ""}
             </div>
-            <span class="pill">${escapeHtml(l.tipo || "Grasa")}</span>
-          </article>
-        `).join("") : `<div class="empty-state">${state.lubricantes.length ? "Sin resultados con esta búsqueda." : "Todavía no hay lubricantes dados de alta para esta empresa."}</div>`;
+            ${l.ficha_tecnica_data_url ? `<span class="lubricante-card-ficha" title="Tiene ficha técnica adjunta">📎</span>` : ""}
+          </article>`;
+        }).join("") : `<div class="empty-state">${state.lubricantes.length ? "Sin resultados con esta búsqueda." : "Todavía no hay lubricantes dados de alta para esta empresa."}</div>`;
 
         view.querySelector(".module-panel").innerHTML = `
           <div class="module-wide ${isSupervisorMode() ? "split-workspace" : ""}">
@@ -2983,7 +3016,7 @@ function renderModules() {
               <div class="list-toolbar">
                 <input value="${escapeHtml(state.lubricanteSearch)}" oninput="buscarLubricantes(this.value)" placeholder="Buscar por nombre, tipo, marca o especificación...">
               </div>
-              <div class="activity-list">${lubricantesHtml}</div>
+              <div class="lubricantes-grid">${lubricantesHtml}</div>
             </section>
           </div>`;
         return;

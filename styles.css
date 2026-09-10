@@ -1,24 +1,30 @@
 ﻿.qr-loading{display:none}
-.acceso-gate{position:fixed;inset:0;z-index:980;background:linear-gradient(160deg,#07112e,#101d4d 60%,#1228ff);display:flex;align-items:center;justify-content:center;padding:24px;overflow-y:auto}
+.acceso-gate{position:fixed;inset:0;z-index:980;background:#f4f6fb;padding:48px 16px;overflow-y:auto}
 .acceso-gate.hidden{display:none}
 body.gate-activo .sidebar,body.gate-activo .mobile-menu-toggle,body.gate-activo .app{display:none!important}
-.acceso-gate-box{background:#fff;border-radius:22px;padding:36px 34px;max-width:440px;width:100%;box-shadow:0 40px 90px rgba(0,0,0,.35);text-align:center}
-.acceso-gate-logo{height:48px;object-fit:contain;margin-bottom:14px}
-.acceso-gate-box h1{font-size:21px;margin:2px 0 20px;color:var(--ink)}
+.acceso-gate-box{background:#fff;border-radius:22px;padding:40px 38px;max-width:440px;width:100%;margin:0 auto;border:1px solid var(--line);box-shadow:0 24px 60px rgba(7,17,46,.10);text-align:center}
+.acceso-gate-logo{height:56px;object-fit:contain;margin-bottom:16px}
+.acceso-gate-box h1{font-size:20px;margin:2px 0 20px;color:var(--ink)}
 .acceso-gate-box .eyebrow{text-align:center}
 .acceso-gate-section{text-align:left;margin-bottom:8px}
 .acceso-gate-label{display:block;font-size:11px;font-weight:900;color:var(--blue);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
 .acceso-gate-row{display:grid;gap:10px;margin-bottom:12px}
 .acceso-gate-row input,.acceso-gate-field select{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:14px;font-family:inherit}
 .acceso-gate-field{display:block;margin-bottom:12px}
-.acceso-gate-primary{width:100%;background:var(--ink);color:#fff;border:0;border-radius:10px;padding:13px;font-weight:900;font-size:14px;cursor:pointer}
-.acceso-gate-primary:hover{background:var(--blue)}
+.acceso-gate-primary{width:100%;background:var(--blue);color:#fff;border:0;border-radius:10px;padding:13px;font-weight:900;font-size:14px;cursor:pointer}
+.acceso-gate-primary:hover{background:#0f1fd6}
 .acceso-gate-secondary{width:100%;background:#eef2ff;color:var(--blue);border:1px solid #c7d0ee;border-radius:10px;padding:13px;font-weight:900;font-size:14px;cursor:pointer}
 .acceso-gate-secondary:hover{background:#dfe6ff}
 .acceso-gate-divider{display:flex;align-items:center;gap:10px;margin:20px 0;color:var(--muted);font-size:12px;font-weight:700}
 .acceso-gate-divider::before,.acceso-gate-divider::after{content:"";flex:1;height:1px;background:var(--line)}
 .gate-error{background:#fdeaea;color:#b42318;border-radius:10px;padding:10px 12px;font-size:13px;font-weight:700;margin:-8px 0 16px}
 .gate-error.hidden{display:none}
+.input-icon{position:relative}
+.input-icon input{padding-left:40px!important;padding-right:14px}
+.input-icon-glyph{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:14px;pointer-events:none}
+.input-icon-toggle{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:none;font-size:15px;cursor:pointer;padding:6px;line-height:1;color:var(--muted)}
+.input-icon input[type="password"],.input-icon input[type="text"]{padding-right:36px!important}
+.acceso-gate-footer{margin:22px 0 0;padding-top:16px;border-top:1px solid var(--line);color:var(--muted);font-size:11px;line-height:1.6}
 @media(max-width:480px){.acceso-gate-box{padding:28px 22px}}
 html.cargando-carta .sidebar,html.cargando-carta .mobile-menu-toggle,html.cargando-carta .sidebar-backdrop,html.cargando-carta .app{display:none!important}
 html.cargando-carta .qr-loading{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;min-height:100vh;background:#fff}
@@ -54,6 +60,34 @@ body.vista-qr .app{padding-top:24px!important}
 .status-pill.ok{background:#e9f9ef;color:#16803c}
 .status-pill.warn{background:#fff4e0;color:#a8620a}
 .status-pill.error{background:#fdeaea;color:#b42318}
+.lubricantes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+.lubricante-card{position:relative;display:flex;gap:14px;align-items:flex-start;border:1px solid var(--line);border-radius:16px;background:#fff;padding:16px;cursor:pointer;transition:box-shadow .15s ease,border-color .15s ease,transform .15s ease}
+.lubricante-card:hover{border-color:var(--blue);box-shadow:0 14px 30px rgba(8,17,45,.10);transform:translateY(-1px)}
+.lubricante-card-icon{flex:0 0 auto;width:52px;height:52px;border-radius:14px;display:grid;place-items:center;font-size:24px;background:#eef2ff}
+.lubricante-card-icon.lube-grasa{background:#eef2ff}
+.lubricante-card-icon.lube-aceite{background:#fff4e0}
+.lubricante-card-icon.lube-otro{background:#f1f2fb}
+.lubricante-card-body{display:flex;flex-direction:column;gap:3px;min-width:0}
+.lubricante-card-body strong{font-size:15px;color:var(--ink);overflow-wrap:anywhere}
+.lubricante-card-tipo{font-size:10.5px;font-weight:900;color:var(--blue);text-transform:uppercase;letter-spacing:.5px}
+.lubricante-card-marca{font-size:12.5px;color:var(--muted);font-weight:700}
+.lubricante-card-spec{font-size:12px;color:var(--muted)}
+.lubricante-card-ficha{position:absolute;top:14px;right:14px;font-size:14px;opacity:.7}
+.lube-detail-hero{display:flex;gap:16px;align-items:center;margin-bottom:18px}
+.lube-detail-icon{flex:0 0 auto;width:72px;height:72px;border-radius:18px;display:grid;place-items:center;font-size:34px;background:#eef2ff}
+.lube-detail-icon.lube-grasa{background:#eef2ff}
+.lube-detail-icon.lube-aceite{background:#fff4e0}
+.lube-detail-icon.lube-otro{background:#f1f2fb}
+.lube-detail-brand{display:block;font-size:11px;font-weight:900;color:var(--blue);text-transform:uppercase;letter-spacing:.6px;margin-bottom:2px}
+.lube-detail-heading h2{font-size:21px;margin:0 0 8px}
+.lube-detail-badges{display:flex;gap:8px;flex-wrap:wrap}
+.lube-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:6px}
+.lube-stat{background:#f7f9ff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;min-width:0}
+.lube-stat span{display:block;font-size:11px;color:var(--muted);font-weight:800;margin-bottom:4px}
+.lube-stat strong{display:block;font-size:13.5px;color:var(--ink);font-weight:800;overflow-wrap:anywhere}
+.lube-file-chip{display:inline-flex;align-items:center;gap:8px;text-decoration:none;background:#eef2ff;color:var(--blue);border:1px solid #c7d0ee;border-radius:10px;padding:10px 16px;font-weight:900;font-size:13.5px}
+.lube-file-chip:hover{background:#dfe6ff}
+@media(max-width:520px){.lube-stats{grid-template-columns:1fr}.lube-detail-hero{flex-direction:column;align-items:flex-start}}
 .aviso-flotante{position:fixed;top:22px;left:50%;transform:translateX(-50%) translateY(-16px);background:#179b52;color:#fff;padding:14px 26px;border-radius:14px;font-weight:800;font-size:14px;letter-spacing:.2px;box-shadow:0 14px 34px rgba(7,17,46,.28);z-index:9999;opacity:0;pointer-events:none;transition:opacity .25s ease,transform .25s ease;max-width:min(92vw,560px);text-align:center}
 .aviso-flotante.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .aviso-flotante.error{background:#c23636}
@@ -71,8 +105,8 @@ body.vista-qr .app{padding-top:24px!important}
 }
 *{box-sizing:border-box}
 .hidden{display:none!important}
-html{overflow-x:hidden}
-body{margin:0;min-height:100vh;display:grid;grid-template-columns:280px 1fr;background:var(--bg);font-family:Segoe UI,Arial,sans-serif;color:var(--ink);overflow-x:hidden;min-width:0}
+html{overflow-x:clip}
+body{margin:0;min-height:100vh;display:grid;grid-template-columns:280px 1fr;background:var(--bg);font-family:Segoe UI,Arial,sans-serif;color:var(--ink);overflow-x:clip;min-width:0}
 .sidebar{background:#fff;color:var(--ink);border-right:1px solid var(--line);padding:18px 24px;display:flex;flex-direction:column;gap:18px;position:sticky;top:0;left:0;align-self:start;height:100vh;overflow-y:auto;z-index:5}
 .brand{display:flex;align-items:center;justify-content:center;gap:14px}
 .brand img{width:132px;height:auto;display:block}

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Sistema de Gestión de Lubricación - MOLUB</title>
-  <link rel="stylesheet" href="./styles.css?v=paso44-ficha-lubricantes">
+  <link rel="stylesheet" href="./styles.css?v=paso45-panel-fijo-diseno">
 </head>
 <body>
   <script>if (/[?&]carta=/.test(location.search)) document.documentElement.classList.add("cargando-carta");</script>
@@ -30,7 +30,7 @@
       <button class="nav" data-view="modulos">Módulos por empresa</button>
     </nav>
     <div class="session">
-      <span>Modo laboratorio</span>
+      <span>Acceso por rol</span>
       <strong id="session-company">Sin empresa</strong>
       <div id="sidebar-auth-session" class="auth-user sidebar-auth hidden">
         <strong id="sidebar-auth-user-label">Sin sesión</strong>
@@ -43,23 +43,30 @@
     <div class="acceso-gate-box">
       <img class="acceso-gate-logo" src="./assets/logo-molub.png" alt="MOLUB">
       <p class="eyebrow">Sistema de Gestión de Lubricación</p>
-      <h1>Inicia sesión para continuar</h1>
+      <h1>Inicia sesión para acceder a la plataforma</h1>
       <p id="gate-error" class="gate-error hidden"></p>
 
       <div class="acceso-gate-section">
-        <span class="acceso-gate-label">Acceso real (supervisor/admin)</span>
+        <span class="acceso-gate-label">Inicia sesión con tu cuenta</span>
         <div class="acceso-gate-row">
-          <input id="gate-email" type="email" autocomplete="username" placeholder="Correo">
-          <input id="gate-password" type="password" autocomplete="current-password" placeholder="Contraseña">
+          <div class="input-icon">
+            <span class="input-icon-glyph">✉</span>
+            <input id="gate-email" type="email" autocomplete="username" placeholder="Correo">
+          </div>
+          <div class="input-icon">
+            <span class="input-icon-glyph">🔒</span>
+            <input id="gate-password" type="password" autocomplete="current-password" placeholder="Contraseña">
+            <button type="button" id="gate-password-toggle" class="input-icon-toggle" onclick="toggleGatePassword()" tabindex="-1" aria-label="Mostrar contraseña">👁</button>
+          </div>
         </div>
-        <button id="gate-login-btn" type="button" class="acceso-gate-primary">Entrar</button>
+        <button id="gate-login-btn" type="button" class="acceso-gate-primary">Iniciar sesión →</button>
       </div>
 
-      <div class="acceso-gate-divider"><span>o continúa en modo laboratorio</span></div>
+      <div class="acceso-gate-divider"><span>o entra por rol y empresa</span></div>
 
       <div class="acceso-gate-section">
         <label class="acceso-gate-field">
-          <span class="acceso-gate-label">Rol de prueba</span>
+          <span class="acceso-gate-label">Rol</span>
           <select id="gate-role-select">
             <option value="SUPERVISOR">Supervisor</option>
             <option value="TECNICO_MEC">Técnico mecánico</option>
@@ -68,11 +75,13 @@
           </select>
         </label>
         <label class="acceso-gate-field">
-          <span class="acceso-gate-label">Empresa activa</span>
+          <span class="acceso-gate-label">Empresa</span>
           <select id="gate-empresa-select"></select>
         </label>
-        <button id="gate-continue-btn" type="button" class="acceso-gate-secondary">Continuar en modo laboratorio</button>
+        <button id="gate-continue-btn" type="button" class="acceso-gate-secondary">Entrar por rol y empresa</button>
       </div>
+
+      <p class="acceso-gate-footer">MOLUB Lubricantes Especializados, S.A. de C.V.<br>© <span id="gate-year"></span> MOLUB. Todos los derechos reservados.</p>
     </div>
   </div>
 
@@ -84,7 +93,7 @@
       </div>
       <img class="top-gear" src="./assets/gear-blue.png" alt="">
       <div class="auth-panel">
-        <span>Acceso real</span>
+        <span>Iniciar sesión</span>
         <div id="auth-login-form" class="auth-login-row">
           <input id="auth-email" type="email" autocomplete="username" placeholder="Correo">
           <input id="auth-password" type="password" autocomplete="current-password" placeholder="Contraseña">
@@ -94,7 +103,7 @@
           <strong id="auth-user-label">Sin sesión</strong>
           <button id="auth-logout" class="secondary-auth" type="button">Salir</button>
         </div>
-        <small id="auth-message" class="auth-message">Modo laboratorio activo.</small>
+        <small id="auth-message" class="auth-message">Acceso por rol activo.</small>
       </div>
       <label class="role-picker">
         <span>Rol de prueba</span>
@@ -230,6 +239,6 @@
   <script src="./config.js?v=paso41-lubricantes"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
-<script src="./app.js?v=paso44-ficha-lubricantes"></script>
+<script src="./app.js?v=paso45-panel-fijo-diseno"></script>
 </body>
 </html>
