@@ -276,7 +276,7 @@ function authDisplayName() {
 }
 
 function syncAuthLockedControls() {
-  const locked = isAuthMode();
+  const locked = Boolean(state.authUser);
   if ($("role-select")) $("role-select").disabled = locked;
   if ($("empresa-select")) $("empresa-select").disabled = locked;
 }
@@ -346,6 +346,12 @@ async function applyAuthSession(session, reload = false) {
     state.selectedUserId = isSupervisorMode() ? "" : state.authPerfil.id;
     if ($("role-select")) $("role-select").value = state.sessionRole;
     if ($("empresa-select") && state.empresaId) $("empresa-select").value = state.empresaId;
+  } else if (state.authUser) {
+    // Cuenta real sin perfil vinculado en Supabase: nunca debe caer en
+    // Supervisor por default, aunque esa fuera la ultima seleccion.
+    state.sessionRole = "TECNICO_MEC";
+    state.selectedUserId = "";
+    if ($("role-select")) $("role-select").value = state.sessionRole;
   }
 
   renderAuthPanel();
