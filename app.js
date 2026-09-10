@@ -781,9 +781,11 @@ function renderLubricantesDeEquipo(equipoId) {
   const filas = usos.map(le => {
     const lub = state.lubricantes.find(l => String(l.id) === String(le.lubricante_id));
     if (!lub) return "";
+    const punto = le.punto_lubricacion && le.punto_lubricacion !== le.componente ? le.punto_lubricacion : "";
+    const detalle = [le.componente, punto].filter(Boolean).join(" · ") || le.frecuencia || "";
     return `<button type="button" class="lube-equipo-chip" onclick="irALubricante('${escapeHtml(lub.id)}')">
       <strong>${escapeHtml(lub.nombre)}</strong>
-      <span>${escapeHtml(le.componente || "")}${le.componente && le.punto_lubricacion ? " · " : ""}${escapeHtml(le.punto_lubricacion || "")}</span>
+      ${detalle ? `<span>${escapeHtml(detalle)}</span>` : ""}
     </button>`;
   }).join("");
   return `<div class="detail-section-title">🧴 Lubricantes utilizados</div><div class="lube-equipo-chips">${filas}</div>`;
