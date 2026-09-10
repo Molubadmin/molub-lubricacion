@@ -1118,9 +1118,14 @@ function lubricanteVisual(tipo) {
   return { icon: "⚙️", clase: "lube-otro" };
 }
 
-function lubricanteColorSwatchHtml(l) {
+function lubricanteColorSwatchHtml(l, grande) {
   if (!l.color_foto_data_url) return "";
-  return `<span class="lube-color-dot" style="background-image:url('${escapeHtml(l.color_foto_data_url)}')" title="${escapeHtml(l.color_nombre || "Color del producto")}"></span>`;
+  return `<span class="lube-color-dot${grande ? " lube-color-dot-lg" : ""}" style="background-image:url('${escapeHtml(l.color_foto_data_url)}')" title="${escapeHtml(l.color_nombre || "Color del producto")}"></span>`;
+}
+
+function lubricanteColorChipHtml(l) {
+  if (!l.color_nombre && !l.color_foto_data_url) return "";
+  return `<span class="lube-color-chip">${lubricanteColorSwatchHtml(l, true)}${l.color_nombre ? escapeHtml(l.color_nombre) : "Color"}</span>`;
 }
 
 function lubricanteIconHtml(l, visual) {
@@ -1466,7 +1471,7 @@ function renderDetalleLubricante() {
           <span class="status-pill">${escapeHtml(l.tipo || "Grasa")}</span>
           ${l.especificacion ? `<span class="pill">${escapeHtml(l.especificacion)}</span>` : ""}
           ${l.codigo ? `<span class="pill">SKU ${escapeHtml(l.codigo)}</span>` : ""}
-          ${l.color_nombre ? `<span class="pill">${lubricanteColorSwatchHtml(l)}${escapeHtml(l.color_nombre)}</span>` : ""}
+          ${lubricanteColorChipHtml(l)}
         </div>
       </div>
       <div class="lube-stats lube-stats-col">
