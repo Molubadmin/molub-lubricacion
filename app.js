@@ -30,6 +30,7 @@ const state = {
   cartaSearch: "",
   cartaAreaFiltro: "",
   equiposAreaFiltro: "",
+  vistaQr: false,
   puntosOcultosCarta: new Set(),
   actividadesFiltro: { q: "", tecnico: "", orden: "recientes" },
   tareasFiltro: { q: "", estado: "", orden: "recientes" },
@@ -2900,6 +2901,17 @@ function renderModules() {
             <div class="empty-state">Selecciona una carta para ver el detalle.</div>
           </section>
         `;
+        if (detailMode && state.vistaQr) {
+          view.querySelector(".module-panel").innerHTML = `
+            <div class="qr-print-view">
+              <div class="qr-print-bar no-print">
+                <img src="${escapeHtml(companyLogoUrl(activeEmpresa()) || "./assets/logo-covia.png")}" alt="">
+                <button class="print-main-action" onclick="imprimirCarta()">Imprimir / Descargar PDF</button>
+              </div>
+              ${panelCarta}
+            </div>`;
+          return;
+        }
         if (detailMode) {
           const cartaEsReal = Boolean(carta.id) && !String(carta.id).startsWith("auto-") && !String(carta.id).startsWith("pendiente-") && !carta.__autoCarta;
           view.querySelector(".module-panel").innerHTML = `
@@ -3009,6 +3021,8 @@ async function abrirCartaDesdeLiga(cartaId) {
   await loadEquipos();
   state.selectedCartaId = cartaId;
   state.cartaDetailMode = true;
+  state.vistaQr = true;
+  document.body.classList.add("vista-qr");
   setView("cartas");
   render();
   clearStatus();
