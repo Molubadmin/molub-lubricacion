@@ -845,7 +845,9 @@ async function guardarLubricante() {
   const especificacion = $("lub-especificacion")?.value.trim();
   const descripcion = $("lub-descripcion")?.value.trim();
   const nota = $("lub-nota")?.value.trim();
+  const colorNombre = $("lub-color-nombre")?.value.trim();
   const foto = $("lub-foto")?.files?.[0];
+  const colorFoto = $("lub-color-foto")?.files?.[0];
   const ficha = $("lub-ficha")?.files?.[0];
   const msds = $("lub-msds")?.files?.[0];
 
@@ -854,11 +856,13 @@ async function guardarLubricante() {
     return;
   }
 
-  for (const [file, label] of [[foto, "La foto del producto"], [ficha, "La ficha técnica"], [msds, "El MSDS"]]) {
+  const soloImagenArchivos = [foto, colorFoto];
+  for (const [file, label] of [[foto, "La foto del producto"], [colorFoto, "La foto del color"], [ficha, "La ficha técnica"], [msds, "El MSDS"]]) {
     if (!file) continue;
+    const soloImagen = soloImagenArchivos.includes(file);
     const esImagenOPdf = file.type === "application/pdf" || file.type.startsWith("image/");
-    if (file === foto ? !file.type.startsWith("image/") : !esImagenOPdf) {
-      mostrarAvisoFlotante(`${label} debe ser ${file === foto ? "una imagen" : "un PDF o una imagen"}.`, "error");
+    if (soloImagen ? !file.type.startsWith("image/") : !esImagenOPdf) {
+      mostrarAvisoFlotante(`${label} debe ser ${soloImagen ? "una imagen" : "un PDF o una imagen"}.`, "error");
       return;
     }
     if (file.size > 4500000) {
@@ -875,6 +879,13 @@ async function guardarLubricante() {
   if (foto) {
     fotoDataUrl = await fileToDataUrl(foto);
     fotoNombre = foto.name;
+  }
+
+  let colorFotoDataUrl = editando?.color_foto_data_url || null;
+  let colorFotoNombre = editando?.color_foto_nombre || null;
+  if (colorFoto) {
+    colorFotoDataUrl = await fileToDataUrl(colorFoto);
+    colorFotoNombre = colorFoto.name;
   }
 
   let fichaDataUrl = editando?.ficha_tecnica_data_url || null;
@@ -903,6 +914,9 @@ async function guardarLubricante() {
     especificacion: especificacion || null,
     descripcion: descripcion || null,
     nota: nota || null,
+    color_nombre: colorNombre || null,
+    color_foto_nombre: colorFotoNombre,
+    color_foto_data_url: colorFotoDataUrl,
     foto_producto_nombre: fotoNombre,
     foto_producto_data_url: fotoDataUrl,
     ficha_tecnica_nombre: fichaNombre,
@@ -922,9 +936,9 @@ async function guardarLubricante() {
     return;
   }
 
-  ["lub-nombre", "lub-marca", "lub-codigo", "lub-especificacion", "lub-descripcion", "lub-nota"].forEach(id => { if ($(id)) $(id).value = ""; });
-  ["lub-foto", "lub-ficha", "lub-msds"].forEach(id => { if ($(id)) $(id).value = ""; });
-  ["lub-foto-preview", "lub-ficha-preview", "lub-msds-preview"].forEach(id => { if ($(id)) $(id).innerHTML = ""; });
+  ["lub-nombre", "lub-marca", "lub-codigo", "lub-especificacion", "lub-descripcion", "lub-nota", "lub-color-nombre"].forEach(id => { if ($(id)) $(id).value = ""; });
+  ["lub-foto", "lub-color-foto", "lub-ficha", "lub-msds"].forEach(id => { if ($(id)) $(id).value = ""; });
+  ["lub-foto-preview", "lub-color-foto-preview", "lub-ficha-preview", "lub-msds-preview"].forEach(id => { if ($(id)) $(id).innerHTML = ""; });
   state.editandoLubricanteId = "";
   await loadLubricantes();
   renderModules();
@@ -1069,6 +1083,7 @@ function previewArchivoLubricante(input, previewId, soloImagen) {
 }
 
 function previewFotoProductoLubricante(input) { previewArchivoLubricante(input, "lub-foto-preview", true); }
+function previewColorFotoLubricante(input) { previewArchivoLubricante(input, "lub-color-foto-preview", true); }
 function previewFichaLubricante(input) { previewArchivoLubricante(input, "lub-ficha-preview", false); }
 function previewMsdsLubricante(input) { previewArchivoLubricante(input, "lub-msds-preview", false); }
 
@@ -1101,6 +1116,11 @@ function lubricanteVisual(tipo) {
   if (t.startsWith("grasa")) return { icon: "🧴", clase: "lube-grasa" };
   if (t.startsWith("aceite")) return { icon: "🛢️", clase: "lube-aceite" };
   return { icon: "⚙️", clase: "lube-otro" };
+}
+
+function lubricanteColorSwatchHtml(l) {
+  if (!l.color_foto_data_url) return "";
+  return `<span class="lube-color-dot" style="background-image:url('${escapeHtml(l.color_foto_data_url)}')" title="${escapeHtml(l.color_nombre || "Color del producto")}"></span>`;
 }
 
 function lubricanteIconHtml(l, visual) {
@@ -1446,6 +1466,7 @@ function renderDetalleLubricante() {
           <span class="status-pill">${escapeHtml(l.tipo || "Grasa")}</span>
           ${l.especificacion ? `<span class="pill">${escapeHtml(l.especificacion)}</span>` : ""}
           ${l.codigo ? `<span class="pill">SKU ${escapeHtml(l.codigo)}</span>` : ""}
+          ${l.color_nombre ? `<span class="pill">${lubricanteColorSwatchHtml(l)}${escapeHtml(l.color_nombre)}</span>` : ""}
         </div>
       </div>
       <div class="lube-stats lube-stats-col">
@@ -3581,7 +3602,7 @@ function renderModules() {
           <article class="lubricante-card" onclick="seleccionarLubricante('${escapeHtml(l.id)}')">
             <div class="lubricante-card-icon ${visual.clase} ${l.foto_producto_data_url ? "has-photo" : ""}">${lubricanteIconHtml(l, visual)}</div>
             <div class="lubricante-card-body">
-              <span class="lubricante-card-tipo">${escapeHtml(l.tipo || "Grasa")}</span>
+              <span class="lubricante-card-tipo">${lubricanteColorSwatchHtml(l)}${escapeHtml(l.tipo || "Grasa")}${l.color_nombre ? ` · ${escapeHtml(l.color_nombre)}` : ""}</span>
               <strong>${escapeHtml(l.nombre)}</strong>
               <span class="lubricante-card-marca">${escapeHtml(l.marca || "Sin marca")}</span>
               ${presPrincipal ? `<span class="lubricante-card-spec">${escapeHtml(presentacionTexto(presPrincipal))}</span>` : ""}
@@ -3631,6 +3652,11 @@ function renderModules() {
                     <div id="lub-foto-preview">${editando?.foto_producto_data_url ? `<div class="closure-photo"><img src="${escapeHtml(editando.foto_producto_data_url)}" alt="Foto actual"><small>Sube otra imagen para reemplazarla</small></div>` : ""}</div>
                     <div id="lub-ficha-preview">${editando?.ficha_tecnica_nombre ? `<div class="closure-photo"><small>📎 Ya tiene: ${escapeHtml(editando.ficha_tecnica_nombre)} (sube otro archivo para reemplazarla)</small></div>` : ""}</div>
                   </div>
+                  <div class="two-cols">
+                    <label>Color de la grasa/aceite<input id="lub-color-nombre" placeholder="Ej: Azul, Ámbar, Café..." value="${escapeHtml(editando?.color_nombre || "")}"></label>
+                    <label>Foto del color (opcional)<input id="lub-color-foto" type="file" accept="image/*" onchange="previewColorFotoLubricante(this)"></label>
+                  </div>
+                  <div id="lub-color-foto-preview">${editando?.color_foto_data_url ? `<div class="closure-photo"><img src="${escapeHtml(editando.color_foto_data_url)}" alt="Color actual"><small>Sube otra imagen para reemplazarla</small></div>` : ""}</div>
                   <label>MSDS / Hoja de seguridad (PDF o imagen)<input id="lub-msds" type="file" accept="application/pdf,image/*" onchange="previewMsdsLubricante(this)"></label>
                   <div id="lub-msds-preview">${editando?.msds_nombre ? `<div class="closure-photo"><small>📎 Ya tiene: ${escapeHtml(editando.msds_nombre)} (sube otro archivo para reemplazarla)</small></div>` : ""}</div>
                   <div class="form-action">
