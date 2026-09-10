@@ -3004,7 +3004,7 @@ function fotosLevantamientoParaEquipo(equipo) {
     fallback.push({
       id: `carta-${carta.id}-equipo`,
       categoria: "Foto equipo",
-      file_name: "Foto migrada desde carta",
+      file_name: "Foto de la carta de lubricación",
       url: fotoEquipo
     });
   }
@@ -3315,7 +3315,7 @@ function renderModules() {
               <span class="pill">${escapeHtml(status)}</span>
               <span class="muted">${state.levantamientoLoading ? "Cargando fotos..." : `${fotos.length} fotos`}</span>
             </div>
-            ${state.levantamiento?.descripcion ? `<p>${escapeHtml(state.levantamiento.descripcion)}</p>` : ""}
+            ${state.levantamiento?.descripcion && !/migrad/i.test(state.levantamiento.descripcion) ? `<p>${escapeHtml(state.levantamiento.descripcion)}</p>` : ""}
             ${renderLubricantesDeEquipo(equipo.id)}
             <div class="photo-grid" aria-label="Fotos de levantamiento">${state.levantamientoLoading ? `<div class="photo-empty wide">Cargando evidencia...</div>` : fotosHtml}</div>
           </div>
@@ -3725,7 +3725,7 @@ function renderModules() {
               <span class="arrow-link" aria-hidden="true">&rsaquo;</span>
             </article>
           `;
-        }).join("") : `<div class="empty-state">Aún no hay cartas migradas para esta empresa.</div>`;
+        }).join("") : `<div class="empty-state">Aún no hay cartas guardadas para esta empresa.</div>`;
         const elementosHtml = elementos.length ? elementos.map((el, index) => `
           <tr>
             <td class="legacy-point-photo">
@@ -3746,7 +3746,7 @@ function renderModules() {
           </tr>
         `).join("") : `
           <tr>
-            <td colspan="12" class="empty-table">Sin elementos migrados todavía. Corre el diagnóstico/migración de elementos para llenar la tabla.</td>
+            <td colspan="12" class="empty-table">Esta carta todavía no tiene puntos de lubricación registrados.</td>
           </tr>
         `;
         const firmas = typeof carta?.firmas === "object" && carta?.firmas ? carta.firmas : {};
@@ -3883,7 +3883,7 @@ function renderModules() {
                 <div>
                   <p class="eyebrow">Cartas realizadas</p>
                   <h2>Cartas realizadas</h2>
-                  <p>Cartas migradas desde el sistema anterior hacia MOLUB.</p>
+                  <p>Cartas de lubricación guardadas para esta empresa.</p>
                 </div>
               </div>
               <div class="filter-row">
@@ -3914,8 +3914,7 @@ function renderModules() {
           <p class="eyebrow">Módulo activo</p>
           <h2>${escapeHtml(module?.label || id)}</h2>
           <p>${escapeHtml(details[id] || module?.desc || "")}</p>
-        </div>
-        <button>Preparar migración</button>`;
+        </div>`;
     }
   });
 }
