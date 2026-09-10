@@ -1,12 +1,14 @@
 ﻿.qr-loading{display:none}
-.acceso-gate{position:fixed;inset:0;z-index:980;background:url(./assets/login-bg.png?v=5) left center/cover no-repeat,#f4f6fb;padding:48px 16px;overflow-y:auto;display:flex;flex-direction:column;justify-content:safe center}
-@media(min-width:1000px){.acceso-gate{background-size:min(1000px,46vw) auto}}
+.acceso-gate{position:fixed;inset:0;z-index:980;background:url(./assets/login-bg.png?v=5) right center/cover no-repeat,#f4f6fb;overflow-y:auto;display:flex}
 .acceso-gate.hidden{display:none}
 body.gate-activo .sidebar,body.gate-activo .mobile-menu-toggle,body.gate-activo .app{display:none!important}
-.acceso-gate-box{background:#fff;border-radius:22px;padding:40px 38px;max-width:440px;width:100%;margin:0 auto;border:1px solid var(--line);box-shadow:0 24px 60px rgba(7,17,46,.10);text-align:center}
-.acceso-gate-logo{height:52px;width:52px;object-fit:contain;margin-bottom:16px;animation:spin 8s linear infinite}
+.acceso-gate-panel{width:100%;max-width:520px;min-height:100%;background:#fff;display:flex;flex-direction:column;justify-content:center;gap:30px;padding:48px 40px;box-shadow:10px 0 50px rgba(7,17,46,.08)}
+.acceso-gate-hero{display:flex;flex-direction:column;align-items:flex-start;gap:14px}
+.acceso-gate-hero-logo{height:44px;object-fit:contain}
+.acceso-gate-hero-rule{width:40px;height:3px;background:var(--blue);border-radius:2px}
+.acceso-gate-hero-tagline{margin:0;color:var(--ink);font-weight:800;text-transform:uppercase;letter-spacing:.8px;font-size:13px;line-height:1.6}
+.acceso-gate-box{width:100%;text-align:left}
 .acceso-gate-box h1{font-size:20px;margin:2px 0 20px;color:var(--ink)}
-.acceso-gate-box .eyebrow{text-align:center}
 .acceso-gate-section{text-align:left;margin-bottom:8px}
 .acceso-gate-label{display:block;font-size:11px;font-weight:900;color:var(--blue);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
 .acceso-gate-row{display:grid;gap:10px;margin-bottom:12px}
@@ -20,9 +22,8 @@ body.gate-activo .sidebar,body.gate-activo .mobile-menu-toggle,body.gate-activo 
 .input-icon-glyph{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:14px;pointer-events:none}
 .input-icon-toggle{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:none;font-size:15px;cursor:pointer;padding:6px;line-height:1;color:var(--muted)}
 .input-icon input[type="password"],.input-icon input[type="text"]{padding-right:36px!important}
-.acceso-gate-footer{margin:22px 0 0;padding-top:16px;border-top:1px solid var(--line);color:var(--muted);font-size:11px;line-height:1.6}
-@media(max-width:480px){.acceso-gate-box{padding:28px 22px}}
-@media(min-width:900px){.acceso-gate-box{margin:0 4vw 0 auto}}
+.acceso-gate-footer{margin:22px 0 0;padding-top:16px;border-top:1px solid var(--line);color:var(--muted);font-size:11px;line-height:1.6;text-align:left}
+@media(max-width:480px){.acceso-gate-panel{padding:32px 24px}}
 html.cargando-carta .sidebar,html.cargando-carta .mobile-menu-toggle,html.cargando-carta .sidebar-backdrop,html.cargando-carta .app{display:none!important}
 html.cargando-carta .qr-loading{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;min-height:100vh;background:#fff}
 html.cargando-carta .qr-loading img{width:64px;height:64px;object-fit:contain;animation:qr-pulse 1.2s ease-in-out infinite}

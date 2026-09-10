@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Sistema de Gestión de Lubricación - MOLUB</title>
-  <link rel="stylesheet" href="./styles.css?v=paso64-fondo-no-toca-tarjeta">
+  <link rel="stylesheet" href="./styles.css?v=paso66-login-real-dom">
 </head>
 <body>
   <script>if (/[?&]carta=/.test(location.search)) document.documentElement.classList.add("cargando-carta");</script>
@@ -40,29 +40,35 @@
   </aside>
 
   <div id="acceso-gate" class="acceso-gate hidden">
-    <div class="acceso-gate-box">
-      <img class="acceso-gate-logo" src="./assets/gear-blue.png" alt="MOLUB">
-      <p class="eyebrow">Sistema de Gestión de Lubricación</p>
-      <h1>Inicia sesión para acceder a la plataforma</h1>
-      <p id="gate-error" class="gate-error hidden"></p>
-
-      <div class="acceso-gate-section">
-        <span class="acceso-gate-label">Inicia sesión con tu cuenta</span>
-        <div class="acceso-gate-row">
-          <div class="input-icon">
-            <span class="input-icon-glyph">✉</span>
-            <input id="gate-email" type="email" autocomplete="username" placeholder="Correo">
-          </div>
-          <div class="input-icon">
-            <span class="input-icon-glyph">🔒</span>
-            <input id="gate-password" type="password" autocomplete="current-password" placeholder="Contraseña">
-            <button type="button" id="gate-password-toggle" class="input-icon-toggle" onclick="toggleGatePassword()" tabindex="-1" aria-label="Mostrar contraseña">👁</button>
-          </div>
-        </div>
-        <button id="gate-login-btn" type="button" class="acceso-gate-primary">Iniciar sesión →</button>
+    <div class="acceso-gate-panel">
+      <div class="acceso-gate-hero">
+        <img class="acceso-gate-hero-logo" src="./assets/logo-molub.png" alt="MOLUB">
+        <span class="acceso-gate-hero-rule"></span>
+        <p class="acceso-gate-hero-tagline">Soluciones que mantienen<br>tu industria en movimiento</p>
       </div>
+      <div class="acceso-gate-box">
+        <p class="eyebrow">Sistema de Gestión de Lubricación</p>
+        <h1>Inicia sesión para acceder a la plataforma</h1>
+        <p id="gate-error" class="gate-error hidden"></p>
 
-      <p class="acceso-gate-footer">MOLUB Lubricantes Especializados, S.A. de C.V.<br>© <span id="gate-year"></span> MOLUB. Todos los derechos reservados.</p>
+        <div class="acceso-gate-section">
+          <span class="acceso-gate-label">Inicia sesión con tu cuenta</span>
+          <div class="acceso-gate-row">
+            <div class="input-icon">
+              <span class="input-icon-glyph">✉</span>
+              <input id="gate-email" type="email" autocomplete="username" placeholder="Correo">
+            </div>
+            <div class="input-icon">
+              <span class="input-icon-glyph">🔒</span>
+              <input id="gate-password" type="password" autocomplete="current-password" placeholder="Contraseña">
+              <button type="button" id="gate-password-toggle" class="input-icon-toggle" onclick="toggleGatePassword()" tabindex="-1" aria-label="Mostrar contraseña">👁</button>
+            </div>
+          </div>
+          <button id="gate-login-btn" type="button" class="acceso-gate-primary">Iniciar sesión →</button>
+        </div>
+
+        <p class="acceso-gate-footer">MOLUB Lubricantes Especializados, S.A. de C.V.<br>© <span id="gate-year"></span> MOLUB. Todos los derechos reservados.</p>
+      </div>
     </div>
   </div>
 
