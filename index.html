@@ -4,9 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Sistema de Gestión de Lubricación - MOLUB</title>
-  <link rel="stylesheet" href="./styles.css?v=paso35-qr-vista-limpia">
+  <link rel="stylesheet" href="./styles.css?v=paso37-qr-bar-fix">
 </head>
 <body>
+  <button class="mobile-menu-toggle" id="mobile-menu-toggle" onclick="toggleSidebarMobile()" aria-label="Abrir menu">&#9776;</button>
+  <div class="sidebar-backdrop" onclick="toggleSidebarMobile(false)"></div>
   <aside class="sidebar">
     <div class="brand">
       <img src="./assets/logo-molub.png" alt="MOLUB">
@@ -181,6 +183,6 @@
   <script src="./config.js?v=paso15e-fotos-grandes"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
-<script src="./app.js?v=paso35-qr-vista-limpia"></script>
+<script src="./app.js?v=paso36-responsive-movil"></script>
 </body>
 </html>

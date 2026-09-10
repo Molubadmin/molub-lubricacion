@@ -3049,8 +3049,17 @@ async function init() {
 }
 
 document.querySelectorAll(".nav").forEach(btn => {
-  btn.addEventListener("click", () => setView(btn.dataset.view));
+  btn.addEventListener("click", () => {
+    setView(btn.dataset.view);
+    toggleSidebarMobile(false);
+  });
 });
+
+function toggleSidebarMobile(forzar) {
+  const abrir = typeof forzar === "boolean" ? forzar : !document.body.classList.contains("sidebar-open");
+  document.body.classList.toggle("sidebar-open", abrir);
+  document.querySelector(".sidebar")?.classList.toggle("open", abrir);
+}
 
 $("empresa-select").addEventListener("change", async (event) => {
   state.empresaId = event.target.value;
