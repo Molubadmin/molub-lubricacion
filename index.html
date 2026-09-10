@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Sistema de Gestión de Lubricación - MOLUB</title>
-  <link rel="stylesheet" href="./styles.css?v=paso45-panel-fijo-diseno">
+  <link rel="stylesheet" href="./styles.css?v=paso46-login-rol-empresa">
 </head>
 <body>
   <script>if (/[?&]carta=/.test(location.search)) document.documentElement.classList.add("cargando-carta");</script>
@@ -62,9 +62,9 @@
         <button id="gate-login-btn" type="button" class="acceso-gate-primary">Iniciar sesión →</button>
       </div>
 
-      <div class="acceso-gate-divider"><span>o entra por rol y empresa</span></div>
+      <button type="button" id="gate-tecnico-link" class="acceso-gate-link" onclick="toggleGateTecnico()">¿Eres técnico y no tienes cuenta? Entra por rol y empresa</button>
 
-      <div class="acceso-gate-section">
+      <div id="gate-tecnico-section" class="acceso-gate-section hidden">
         <label class="acceso-gate-field">
           <span class="acceso-gate-label">Rol</span>
           <select id="gate-role-select">
@@ -239,6 +239,6 @@
   <script src="./config.js?v=paso41-lubricantes"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
-<script src="./app.js?v=paso45-panel-fijo-diseno"></script>
+<script src="./app.js?v=paso46-login-rol-empresa"></script>
 </body>
 </html>

@@ -15,8 +15,9 @@ body.gate-activo .sidebar,body.gate-activo .mobile-menu-toggle,body.gate-activo 
 .acceso-gate-primary:hover{background:#0f1fd6}
 .acceso-gate-secondary{width:100%;background:#eef2ff;color:var(--blue);border:1px solid #c7d0ee;border-radius:10px;padding:13px;font-weight:900;font-size:14px;cursor:pointer}
 .acceso-gate-secondary:hover{background:#dfe6ff}
-.acceso-gate-divider{display:flex;align-items:center;gap:10px;margin:20px 0;color:var(--muted);font-size:12px;font-weight:700}
-.acceso-gate-divider::before,.acceso-gate-divider::after{content:"";flex:1;height:1px;background:var(--line)}
+.acceso-gate-link{display:block;width:100%;text-align:center;background:none;border:0;color:var(--muted);font-size:12.5px;font-weight:700;cursor:pointer;margin:18px 0 4px;padding:6px;text-decoration:underline;text-underline-offset:3px}
+.acceso-gate-link:hover{color:var(--blue)}
+#gate-tecnico-section{margin-top:14px;padding-top:16px;border-top:1px solid var(--line)}
 .gate-error{background:#fdeaea;color:#b42318;border-radius:10px;padding:10px 12px;font-size:13px;font-weight:700;margin:-8px 0 16px}
 .gate-error.hidden{display:none}
 .input-icon{position:relative}

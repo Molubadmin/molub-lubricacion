@@ -282,7 +282,7 @@ function renderAuthPanel() {
   const msg = $("auth-message");
   if (msg) {
     msg.textContent = locked
-      ? `Sesión real: ${authDisplayName()}`
+      ? `${authDisplayName()} · ${roleLabel(state.sessionRole)} · ${activeEmpresa()?.nombre || "sin empresa"}`
       : logged
         ? "Sesión activa sin perfil vinculado. Revisa el Paso 19."
         : "Acceso por rol activo.";
@@ -290,7 +290,7 @@ function renderAuthPanel() {
   }
 
   const sessionBox = document.querySelector(".session span");
-  if (sessionBox) sessionBox.textContent = locked ? "Sesión activa" : "Acceso por rol";
+  if (sessionBox) sessionBox.textContent = locked ? roleLabel(state.sessionRole) : "Acceso por rol";
   syncAuthLockedControls();
 }
 
@@ -408,6 +408,26 @@ function toggleGatePassword() {
   const oculto = input.type === "password";
   input.type = oculto ? "text" : "password";
   btn.textContent = oculto ? "🙈" : "👁";
+}
+
+function toggleGateTecnico(forzar) {
+  const section = $("gate-tecnico-section");
+  const link = $("gate-tecnico-link");
+  if (!section) return;
+  const abrir = typeof forzar === "boolean" ? forzar : section.classList.contains("hidden");
+  section.classList.toggle("hidden", !abrir);
+  if (link) link.textContent = abrir ? "Ya tengo cuenta, iniciar sesión con correo" : "¿Eres técnico y no tienes cuenta? Entra por rol y empresa";
+  if (link) link.onclick = () => toggleGateTecnico(!abrir);
+}
+
+function roleLabel(value) {
+  const map = {
+    SUPERVISOR: "Supervisor",
+    TECNICO_MEC: "Técnico mecánico",
+    TECNICO_ELC: "Técnico eléctrico",
+    TECNICO_CONTR: "Contratista"
+  };
+  return map[String(value || "").toUpperCase()] || "Usuario";
 }
 
 function mostrarErrorGate(mensaje) {
@@ -3382,6 +3402,8 @@ async function intentarLoginDesdeGate() {
   if (state.authUser) {
     if ($("gate-password")) $("gate-password").value = "";
     ocultarGateAcceso();
+    const empresaNombre = activeEmpresa()?.nombre || "tu empresa";
+    mostrarAvisoFlotante(`Bienvenido, ${authDisplayName()} · ${roleLabel(state.sessionRole)} · ${empresaNombre}`, "ok");
   } else {
     mostrarErrorGate(traducirErrorAuth($("status")?.textContent));
   }
@@ -3418,6 +3440,8 @@ $("gate-continue-btn")?.addEventListener("click", async () => {
   ocultarGateAcceso();
   setStatus("Cargando equipos de la empresa seleccionada...");
   await loadEquipos();
+  const empresaNombre = activeEmpresa()?.nombre || "tu empresa";
+  mostrarAvisoFlotante(`Acceso por rol: ${roleLabel(rol)} · ${empresaNombre}`, "ok");
 });
 
 sb.auth.onAuthStateChange((_event, session) => {
