@@ -1,5 +1,5 @@
 ﻿.qr-loading{display:none}
-.acceso-gate{position:fixed;inset:0;z-index:980;background:#f4f6fb;padding:48px 16px;overflow-y:auto}
+.acceso-gate{position:fixed;inset:0;z-index:980;background:url(./assets/login-bg.png) left center/cover no-repeat,#f4f6fb;padding:48px 16px;overflow-y:auto}
 .acceso-gate.hidden{display:none}
 body.gate-activo .sidebar,body.gate-activo .mobile-menu-toggle,body.gate-activo .app{display:none!important}
 .acceso-gate-box{background:#fff;border-radius:22px;padding:40px 38px;max-width:440px;width:100%;margin:0 auto;border:1px solid var(--line);box-shadow:0 24px 60px rgba(7,17,46,.10);text-align:center}
@@ -69,16 +69,46 @@ body.vista-qr .app{padding-top:24px!important}
 .lubricante-card-tipo{font-size:10.5px;font-weight:900;color:var(--blue);text-transform:uppercase;letter-spacing:.5px}
 .lubricante-card-marca{font-size:12.5px;color:var(--muted);font-weight:700}
 .lubricante-card-spec{font-size:12px;color:var(--muted)}
+.lubricante-card-equipos{font-size:11.5px;color:var(--blue);font-weight:800;margin-top:2px}
 .lubricante-card-ficha{position:absolute;top:14px;right:14px;font-size:14px;opacity:.7}
-.lube-detail-hero{display:flex;gap:16px;align-items:center;margin-bottom:18px}
+.lube-page-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+.lube-page-actions{display:flex;gap:10px}
+.lube-detail-layout{display:grid;grid-template-columns:180px 1fr 260px;gap:24px;align-items:start;margin-bottom:18px}
 .lube-detail-icon{flex:0 0 auto;width:72px;height:72px;border-radius:18px;display:grid;place-items:center;font-size:34px;background:#eef2ff}
+.lube-detail-icon-lg{width:100%;height:180px;border-radius:20px;font-size:64px}
 .lube-detail-icon.lube-grasa{background:#eef2ff}
 .lube-detail-icon.lube-aceite{background:#fff4e0}
 .lube-detail-icon.lube-otro{background:#f1f2fb}
 .lube-detail-brand{display:block;font-size:11px;font-weight:900;color:var(--blue);text-transform:uppercase;letter-spacing:.6px;margin-bottom:2px}
-.lube-detail-heading h2{font-size:21px;margin:0 0 8px}
+.lube-detail-heading h2{font-size:23px;margin:0 0 8px}
+.lube-detail-desc{color:var(--muted);font-size:13.5px;line-height:1.5;margin:0 0 12px}
 .lube-detail-badges{display:flex;gap:8px;flex-wrap:wrap}
 .lube-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:6px}
+.lube-stats-col{grid-template-columns:1fr}
+.lube-tabs{display:flex;gap:6px;flex-wrap:wrap;border-bottom:1px solid var(--line);margin:20px 0 16px;padding-bottom:0}
+.lube-tabs button.lube-tab{border:0;border-radius:0;background:none;padding:10px 4px;margin-right:18px;font-weight:900;font-size:13px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent}
+.lube-tabs button.lube-tab:hover{color:var(--ink)}
+.lube-tabs button.lube-tab.active{color:var(--blue);border-bottom:2px solid var(--blue)}
+.lube-tab-content{display:grid;gap:12px}
+.lube-doc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.lube-doc-card{border:1px solid var(--line);border-radius:14px;padding:16px;background:#fbfcff;display:grid;gap:10px}
+.lube-doc-card strong{font-size:13.5px;color:var(--ink)}
+.lube-doc-upload{display:inline-block;font-size:11.5px;font-weight:800;color:var(--blue);cursor:pointer}
+.lube-doc-upload input{display:none}
+.lube-checkbox-field{display:flex;align-items:center;gap:8px;flex-direction:row!important;font-weight:700!important;text-transform:none!important;font-size:13px!important;color:var(--ink)!important}
+.lube-checkbox-field input{width:16px;height:16px}
+.lube-inv-input{width:80px;border:1px solid var(--line);border-radius:8px;padding:6px 8px;font:inherit}
+.lube-inv-bajo td{background:#fff5f5}
+.lube-uso-table-actions{width:34px;text-align:center}
+.lube-uso-table button.icon-danger-button{width:26px;height:26px;border:0;border-radius:999px;background:#f1f2fb;color:#5a6280;display:inline-flex;align-items:center;justify-content:center;padding:0;font-size:0;line-height:1;cursor:pointer;appearance:none}
+.lube-uso-table button.icon-danger-button::before{content:"\00d7";display:block;font-family:Arial,sans-serif;font-size:18px;line-height:1}
+.lube-uso-table button.icon-danger-button:hover{background:#dc2626;color:#fff}
+.lube-equipo-chips{display:flex;flex-wrap:wrap;gap:8px}
+.lube-equipo-chip{display:flex;flex-direction:column;gap:2px;text-align:left;border:1px solid var(--line);background:#fbfcff;border-radius:10px;padding:8px 12px;cursor:pointer;font:inherit}
+.lube-equipo-chip:hover{border-color:var(--blue)}
+.lube-equipo-chip strong{font-size:12.5px;color:var(--blue)}
+.lube-equipo-chip span{font-size:11px;color:var(--muted)}
+@media(max-width:900px){.lube-detail-layout{grid-template-columns:1fr;}.lube-detail-icon-lg{width:140px;height:140px;justify-self:start}}
 .lube-stat{background:#f7f9ff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;min-width:0}
 .lube-stat span{display:block;font-size:11px;color:var(--muted);font-weight:800;margin-bottom:4px}
 .lube-stat strong{display:block;font-size:13.5px;color:var(--ink);font-weight:800;overflow-wrap:anywhere}
@@ -91,7 +121,6 @@ body.vista-qr .app{padding-top:24px!important}
 .lube-uso-table tr:last-child td{border-bottom:0}
 .lube-form-panel{background:#f8faff;border:1px solid var(--line);border-radius:16px;padding:18px 20px;margin-bottom:16px}
 .lube-form-panel h3{margin:0 0 12px;font-size:15px;color:var(--ink)}
-@media(max-width:520px){.lube-detail-hero{flex-direction:column;align-items:flex-start}}
 .aviso-flotante{position:fixed;top:22px;left:50%;transform:translateX(-50%) translateY(-16px);background:#179b52;color:#fff;padding:14px 26px;border-radius:14px;font-weight:800;font-size:14px;letter-spacing:.2px;box-shadow:0 14px 34px rgba(7,17,46,.28);z-index:9999;opacity:0;pointer-events:none;transition:opacity .25s ease,transform .25s ease;max-width:min(92vw,560px);text-align:center}
 .aviso-flotante.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .aviso-flotante.error{background:#c23636}
@@ -164,6 +193,10 @@ select:disabled,input:disabled{opacity:.72;cursor:not-allowed}
 .module-toggle.enabled .switch{background:var(--accent)}.module-toggle.enabled .switch::after{left:23px}
 .module-toggle{cursor:pointer}
 .module-panel{display:flex;justify-content:space-between;align-items:center;gap:18px;padding:26px;min-width:0}.module-panel>*{min-width:0}.module-panel p:last-child{color:var(--muted);line-height:1.55;max-width:780px}.module-panel button{border:none;background:var(--blue);color:white;border-radius:12px;padding:12px 16px;font-weight:900}
+.module-panel .ghost-action{background:#fff;border:1px solid var(--line);color:var(--muted)}
+.module-panel .ghost-action:hover{border-color:var(--blue);color:var(--blue)}
+.module-panel .reject-action{background:#b42318}
+.module-panel .approve-action{background:#16803c}
 .module-wide{width:100%}.form-preview{display:grid;gap:10px;max-width:780px;margin-top:16px}.form-preview label{display:grid;gap:6px;color:var(--ink);font-weight:900;text-transform:uppercase;font-size:12px;letter-spacing:.4px}.form-preview textarea{min-height:92px;resize:vertical;border:1px solid var(--line);border-radius:10px;padding:12px;font:inherit;text-transform:none;font-weight:400}.two-cols{display:grid;grid-template-columns:1fr 1fr;gap:10px}.empty-state{border:1px solid var(--line);border-radius:14px;background:#fbfcff;color:var(--muted);padding:34px;text-align:center;margin-top:16px}.mini-cards{grid-template-columns:repeat(2,minmax(160px,260px));margin:16px 0}
 .split-workspace{display:grid;grid-template-columns:minmax(320px,1fr) minmax(320px,520px);gap:22px;align-items:start}.compact-head{margin-bottom:10px}.activity-list{display:grid;gap:10px}.activity-row{border:1px solid var(--line);border-radius:12px;background:#fbfcff;padding:12px;display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.activity-row.clickable{cursor:pointer}.activity-row.clickable:hover{border-color:var(--blue)}.activity-row.selected{border-color:var(--blue);background:#f5f8ff}.activity-row strong,.activity-row span,.activity-row small{display:block}.activity-row div span,.activity-row small{color:var(--muted);font-size:12px;margin-top:4px;line-height:1.35}.row-actions{display:grid;gap:8px;justify-items:end;min-width:112px}.secondary-action{border:1px solid var(--line);background:#fff;color:var(--blue);border-radius:10px;padding:8px 10px;font-weight:900;cursor:pointer}.secondary-action:hover{border-color:var(--blue)}.form-action{display:flex;justify-content:flex-end;margin-top:4px}.review-actions{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}.approve-action,.reject-action{border:none;border-radius:10px;padding:12px 14px;color:#fff;font-weight:900;cursor:pointer}.approve-action{background:#16803c}.reject-action{background:#b42318}.nav.hidden{display:none}
 .workers-box{display:grid;gap:10px}.worker-title{color:var(--muted);font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid var(--line);padding-bottom:6px}.worker-tools{display:flex;gap:8px;flex-wrap:wrap}.worker-tools button{border:1px solid var(--line);background:#fff;color:var(--muted);border-radius:10px;padding:8px 12px;font-weight:900;cursor:pointer}.worker-tools button.active{background:var(--blue);border-color:var(--blue);color:#fff}.workers-list{display:grid;gap:8px;max-height:260px;overflow:auto;padding-right:4px}.worker-row{display:grid;grid-template-columns:auto 38px 1fr;gap:10px;align-items:center;border:1px solid var(--line);border-radius:12px;background:#fbfcff;padding:10px;text-transform:none!important;letter-spacing:0!important;font-size:14px!important}.worker-row input{width:18px;height:18px}.worker-row .avatar{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:#eef2ff;color:var(--blue);font-weight:900}.worker-row strong{display:block;color:var(--ink)}.worker-row small{display:block;color:var(--muted);font-size:12px;margin-top:2px}.empty-state.small{padding:16px;margin-top:0;text-align:left}

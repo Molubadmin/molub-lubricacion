@@ -12,6 +12,8 @@ window.MOLUB_CONFIG = {
     cartas: "cartas_lubricacion",
     elementosCartas: "elementos_lubricacion",
     empresaModulos: "empresa_modulos_app",
-    lubricantes: "lubricantes"
+    lubricantes: "lubricantes",
+    lubricanteEquipos: "lubricante_equipos",
+    lubricantePresentaciones: "lubricante_presentaciones"
   }
 };

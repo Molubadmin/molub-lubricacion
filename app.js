@@ -11,10 +11,17 @@ const state = {
   cartas: [],
   elementosCartas: [],
   lubricantes: [],
+  lubricanteEquipos: [],
+  lubricantePresentaciones: [],
   selectedLubricanteId: "",
+  lubricanteDetailMode: false,
+  lubricanteTab: "equipos",
+  lubricanteAsociarFormAbierto: false,
+  lubricantePresentacionFormAbierto: false,
   editandoLubricanteId: "",
   lubricanteFormAbierto: false,
   lubricanteSearch: "",
+  lubricantesFiltro: { tipo: "", marca: "", area: "", estado: "" },
   perfiles: [],
   sessionRole: "SUPERVISOR",
   selectedUserId: "",
@@ -518,14 +525,7 @@ function filtrarPorTextoYEstado(rows, filtro, camposTexto, campoTrabajador) {
 }
 
 function opcionesTrabajador(rows, campoOFn, actual) {
-  const nombres = new Set();
-  rows.forEach(row => {
-    const valor = typeof campoOFn === "function" ? campoOFn(row) : row[campoOFn];
-    if (valor) nombres.add(String(valor));
-  });
-  const ordenados = [...nombres].sort((a, b) => a.localeCompare(b));
-  return `<option value="" ${!actual ? "selected" : ""}>Todos los trabajadores</option>` +
-    ordenados.map(n => `<option value="${escapeHtml(n)}" ${actual === n ? "selected" : ""}>${escapeHtml(n)}</option>`).join("");
+  return opcionesDistintas(rows, campoOFn, actual, "Todos los trabajadores");
 }
 
 function tareasFiltradas(rows) {
@@ -677,6 +677,8 @@ async function loadEquipos() {
   await loadCartas();
   await loadElementosCartas();
   await loadLubricantes();
+  await loadLubricanteEquipos();
+  await loadLubricantePresentaciones();
   await loadPerfiles();
   if (!state.equipos.some(e => e.id === state.selectedEquipoId)) {
     state.selectedEquipoId = state.equipos[0]?.id || "";
@@ -721,16 +723,109 @@ async function loadLubricantes() {
   state.lubricantes = data || [];
 }
 
+async function loadLubricanteEquipos() {
+  state.lubricanteEquipos = [];
+  if (!cfg.tables.lubricanteEquipos || !state.empresaId) return;
+  const { data, error } = await sb
+    .from(cfg.tables.lubricanteEquipos)
+    .select("*")
+    .eq("empresa_id", state.empresaId);
+  if (error) {
+    console.warn("No se pudieron cargar equipos asociados a lubricantes:", error.message);
+    return;
+  }
+  state.lubricanteEquipos = data || [];
+}
+
+async function loadLubricantePresentaciones() {
+  state.lubricantePresentaciones = [];
+  if (!cfg.tables.lubricantePresentaciones || !state.empresaId) return;
+  const { data, error } = await sb
+    .from(cfg.tables.lubricantePresentaciones)
+    .select("*")
+    .eq("empresa_id", state.empresaId);
+  if (error) {
+    console.warn("No se pudieron cargar presentaciones de lubricantes:", error.message);
+    return;
+  }
+  state.lubricantePresentaciones = data || [];
+}
+
+function equiposAsociadosDe(lubricanteId) {
+  return state.lubricanteEquipos.filter(le => String(le.lubricante_id) === String(lubricanteId));
+}
+
+function presentacionesDe(lubricanteId) {
+  return state.lubricantePresentaciones.filter(p => String(p.lubricante_id) === String(lubricanteId));
+}
+
+function presentacionPrincipal(lubricanteId) {
+  const pres = presentacionesDe(lubricanteId);
+  return pres.find(p => p.es_principal) || pres[0] || null;
+}
+
+function presentacionTexto(p) {
+  if (!p) return "";
+  return `${p.nombre || "Presentación"}${p.cantidad ? ` de ${p.cantidad} ${p.unidad || "kg"}` : ""}`;
+}
+
+function lubricantesQueUsanEquipo(equipoId) {
+  return state.lubricanteEquipos.filter(le => String(le.equipo_id) === String(equipoId));
+}
+
+function renderLubricantesDeEquipo(equipoId) {
+  const usos = lubricantesQueUsanEquipo(equipoId);
+  if (!usos.length) return "";
+  const filas = usos.map(le => {
+    const lub = state.lubricantes.find(l => String(l.id) === String(le.lubricante_id));
+    if (!lub) return "";
+    return `<button type="button" class="lube-equipo-chip" onclick="irALubricante('${escapeHtml(lub.id)}')">
+      <strong>${escapeHtml(lub.nombre)}</strong>
+      <span>${escapeHtml(le.componente || "")}${le.componente && le.punto_lubricacion ? " · " : ""}${escapeHtml(le.punto_lubricacion || "")}</span>
+    </button>`;
+  }).join("");
+  return `<div class="detail-section-title">🧴 Lubricantes utilizados</div><div class="lube-equipo-chips">${filas}</div>`;
+}
+
+function irALubricante(id) {
+  setView("lubricantes");
+  seleccionarLubricante(id);
+}
+
+function opcionesDistintas(rows, campoOFn, actual, etiquetaTodos) {
+  const valores = new Set();
+  rows.forEach(row => {
+    const v = typeof campoOFn === "function" ? campoOFn(row) : row[campoOFn];
+    if (v) valores.add(String(v));
+  });
+  const ordenados = [...valores].sort((a, b) => a.localeCompare(b));
+  return `<option value="" ${!actual ? "selected" : ""}>${escapeHtml(etiquetaTodos)}</option>` +
+    ordenados.map(v => `<option value="${escapeHtml(v)}" ${actual === v ? "selected" : ""}>${escapeHtml(v)}</option>`).join("");
+}
+
 function lubricantesFiltrados() {
   const q = String(state.lubricanteSearch || "").trim().toLowerCase();
-  if (!q) return state.lubricantes;
-  return state.lubricantes.filter(l =>
-    [l.nombre, l.tipo, l.marca, l.especificacion].join(" ").toLowerCase().includes(q)
-  );
+  const { tipo, marca, area, estado } = state.lubricantesFiltro;
+  return state.lubricantes.filter(l => {
+    const matchQ = !q || [l.nombre, l.marca, l.codigo].join(" ").toLowerCase().includes(q);
+    const matchTipo = !tipo || (l.tipo || "Grasa") === tipo;
+    const matchMarca = !marca || (l.marca || "") === marca;
+    const matchEstado = !estado || (estado === "activo" ? l.activo !== false : l.activo === false);
+    const matchArea = !area || equiposAsociadosDe(l.id).some(le => {
+      const eq = state.equipos.find(e => e.id === le.equipo_id);
+      return eq && eq.area === area;
+    });
+    return matchQ && matchTipo && matchMarca && matchEstado && matchArea;
+  });
 }
 
 function buscarLubricantes(value) {
   state.lubricanteSearch = value || "";
+  renderModules();
+}
+
+function actualizarFiltroLubricantes(campo, valor) {
+  state.lubricantesFiltro[campo] = valor;
   renderModules();
 }
 
@@ -740,35 +835,32 @@ async function guardarLubricante() {
     return;
   }
   const nombre = $("lub-nombre")?.value.trim();
-  const tipo = $("lub-tipo")?.value || "Grasa";
   const marca = $("lub-marca")?.value.trim();
+  const tipo = $("lub-tipo")?.value || "Grasa";
+  const codigo = $("lub-codigo")?.value.trim();
   const especificacion = $("lub-especificacion")?.value.trim();
+  const descripcion = $("lub-descripcion")?.value.trim();
   const nota = $("lub-nota")?.value.trim();
   const foto = $("lub-foto")?.files?.[0];
   const ficha = $("lub-ficha")?.files?.[0];
+  const msds = $("lub-msds")?.files?.[0];
 
   if (!nombre) {
     mostrarAvisoFlotante("Escribe el nombre del lubricante antes de guardar.", "error");
     return;
   }
 
-  if (foto && !foto.type.startsWith("image/")) {
-    mostrarAvisoFlotante("La foto del producto debe ser una imagen.", "error");
-    return;
-  }
-  if (foto && foto.size > 4500000) {
-    mostrarAvisoFlotante("Esa foto pesa demasiado, usa una menor a 4.5 MB.", "error");
-    return;
-  }
-
-  if (ficha && !(ficha.type === "application/pdf" || ficha.type.startsWith("image/"))) {
-    mostrarAvisoFlotante("La ficha técnica debe ser un PDF o una imagen.", "error");
-    return;
-  }
-
-  if (ficha && ficha.size > 4500000) {
-    mostrarAvisoFlotante("Ese archivo pesa demasiado, usa uno menor a 4.5 MB.", "error");
-    return;
+  for (const [file, label] of [[foto, "La foto del producto"], [ficha, "La ficha técnica"], [msds, "El MSDS"]]) {
+    if (!file) continue;
+    const esImagenOPdf = file.type === "application/pdf" || file.type.startsWith("image/");
+    if (file === foto ? !file.type.startsWith("image/") : !esImagenOPdf) {
+      mostrarAvisoFlotante(`${label} debe ser ${file === foto ? "una imagen" : "un PDF o una imagen"}.`, "error");
+      return;
+    }
+    if (file.size > 4500000) {
+      mostrarAvisoFlotante(`${label} pesa demasiado, usa un archivo menor a 4.5 MB.`, "error");
+      return;
+    }
   }
 
   const editandoId = state.editandoLubricanteId;
@@ -790,17 +882,31 @@ async function guardarLubricante() {
     fichaTipo = ficha.type;
   }
 
+  let msdsDataUrl = editando?.msds_data_url || null;
+  let msdsNombre = editando?.msds_nombre || null;
+  let msdsTipo = editando?.msds_tipo || null;
+  if (msds) {
+    msdsDataUrl = await fileToDataUrl(msds);
+    msdsNombre = msds.name;
+    msdsTipo = msds.type;
+  }
+
   const payload = {
     nombre,
     tipo,
     marca: marca || null,
+    codigo: codigo || null,
     especificacion: especificacion || null,
+    descripcion: descripcion || null,
     nota: nota || null,
     foto_producto_nombre: fotoNombre,
     foto_producto_data_url: fotoDataUrl,
     ficha_tecnica_nombre: fichaNombre,
     ficha_tecnica_tipo: fichaTipo,
-    ficha_tecnica_data_url: fichaDataUrl
+    ficha_tecnica_data_url: fichaDataUrl,
+    msds_nombre: msdsNombre,
+    msds_tipo: msdsTipo,
+    msds_data_url: msdsDataUrl
   };
 
   const { error } = editando
@@ -808,15 +914,13 @@ async function guardarLubricante() {
     : await sb.from(cfg.tables.lubricantes).insert({ ...payload, empresa_id: state.empresaId });
 
   if (error) {
-    mostrarAvisoFlotante(`No se pudo guardar el lubricante: ${error.message}. Corre el Paso 22/23/25 si aún no los has corrido.`, "error");
+    mostrarAvisoFlotante(`No se pudo guardar el lubricante: ${error.message}. Corre el Paso 22/23/25/26 si aún no los has corrido.`, "error");
     return;
   }
 
-  ["lub-nombre", "lub-marca", "lub-especificacion", "lub-nota"].forEach(id => { if ($(id)) $(id).value = ""; });
-  if ($("lub-foto")) $("lub-foto").value = "";
-  if ($("lub-foto-preview")) $("lub-foto-preview").innerHTML = "";
-  if ($("lub-ficha")) $("lub-ficha").value = "";
-  if ($("lub-ficha-preview")) $("lub-ficha-preview").innerHTML = "";
+  ["lub-nombre", "lub-marca", "lub-codigo", "lub-especificacion", "lub-descripcion", "lub-nota"].forEach(id => { if ($(id)) $(id).value = ""; });
+  ["lub-foto", "lub-ficha", "lub-msds"].forEach(id => { if ($(id)) $(id).value = ""; });
+  ["lub-foto-preview", "lub-ficha-preview", "lub-msds-preview"].forEach(id => { if ($(id)) $(id).innerHTML = ""; });
   state.editandoLubricanteId = "";
   await loadLubricantes();
   renderModules();
@@ -827,8 +931,7 @@ function editarLubricante(id) {
   if (!isSupervisorMode()) return;
   state.editandoLubricanteId = id;
   state.lubricanteFormAbierto = true;
-  cerrarModal();
-  setView("lubricantes");
+  state.lubricanteDetailMode = false;
   renderModules();
   document.getElementById("lub-nombre")?.scrollIntoView({ behavior: "smooth", block: "center" });
 }
@@ -845,42 +948,50 @@ function toggleLubricanteForm() {
   renderModules();
 }
 
-function previewFotoProductoLubricante(input) {
-  const preview = $("lub-foto-preview");
+function previewArchivoLubricante(input, previewId, soloImagen) {
+  const preview = $(previewId);
   const file = input?.files?.[0];
   if (!preview || !file) return;
-
-  if (!file.type.startsWith("image/")) {
-    preview.innerHTML = `<div class="empty-state small">Selecciona una imagen.</div>`;
-    return;
-  }
-  if (file.size > 4500000) {
-    preview.innerHTML = `<div class="empty-state small">Esa foto pesa demasiado, usa una menor a 4.5 MB.</div>`;
-    return;
-  }
-  const url = URL.createObjectURL(file);
-  preview.innerHTML = `<div class="closure-photo"><img src="${url}" alt="Vista previa"></div>`;
-}
-
-function previewFichaLubricante(input) {
-  const preview = $("lub-ficha-preview");
-  const file = input?.files?.[0];
-  if (!preview || !file) return;
-
-  if (!(file.type === "application/pdf" || file.type.startsWith("image/"))) {
-    preview.innerHTML = `<div class="empty-state small">Selecciona un PDF o una imagen.</div>`;
+  const valido = soloImagen ? file.type.startsWith("image/") : (file.type === "application/pdf" || file.type.startsWith("image/"));
+  if (!valido) {
+    preview.innerHTML = `<div class="empty-state small">${soloImagen ? "Selecciona una imagen." : "Selecciona un PDF o una imagen."}</div>`;
     return;
   }
   if (file.size > 4500000) {
     preview.innerHTML = `<div class="empty-state small">Ese archivo pesa demasiado, usa uno menor a 4.5 MB.</div>`;
     return;
   }
-  preview.innerHTML = `<div class="closure-photo"><small>📎 ${escapeHtml(file.name)}</small></div>`;
+  if (file.type.startsWith("image/")) {
+    preview.innerHTML = `<div class="closure-photo"><img src="${URL.createObjectURL(file)}" alt="Vista previa"></div>`;
+  } else {
+    preview.innerHTML = `<div class="closure-photo"><small>📎 ${escapeHtml(file.name)}</small></div>`;
+  }
 }
+
+function previewFotoProductoLubricante(input) { previewArchivoLubricante(input, "lub-foto-preview", true); }
+function previewFichaLubricante(input) { previewArchivoLubricante(input, "lub-ficha-preview", false); }
+function previewMsdsLubricante(input) { previewArchivoLubricante(input, "lub-msds-preview", false); }
 
 function seleccionarLubricante(id) {
   state.selectedLubricanteId = id;
-  abrirModal(renderPanelLubricante());
+  state.lubricanteDetailMode = true;
+  state.lubricanteTab = "equipos";
+  state.lubricanteAsociarFormAbierto = false;
+  state.lubricantePresentacionFormAbierto = false;
+  renderModules();
+}
+
+function volverListaLubricantes() {
+  state.lubricanteDetailMode = false;
+  state.selectedLubricanteId = "";
+  renderModules();
+}
+
+function cambiarTabLubricante(tab) {
+  state.lubricanteTab = tab;
+  state.lubricanteAsociarFormAbierto = false;
+  state.lubricantePresentacionFormAbierto = false;
+  renderModules();
 }
 
 function lubricanteVisual(tipo) {
@@ -897,79 +1008,343 @@ function lubricanteIconHtml(l, visual) {
   return visual.icon;
 }
 
-function usoLubricante(lubricante) {
-  const nombre = String(lubricante?.nombre || "").trim().toLowerCase();
-  if (!nombre) return [];
-  return state.elementosCartas.filter(el => {
-    const valor = String(el.lubricante || "").trim().toLowerCase();
-    return valor && (valor === nombre || valor.includes(nombre) || nombre.includes(valor));
-  });
+function tabLabelLubricante(t) {
+  return {
+    equipos: "Equipos",
+    presentaciones: "Presentaciones",
+    inventario: "Inventario",
+    documentacion: "Documentación",
+    consumos: "Historial de consumos"
+  }[t] || t;
 }
 
-function renderPanelLubricante() {
-  const l = state.lubricantes.find(item => String(item.id) === String(state.selectedLubricanteId));
-  if (!l) return `<div class="empty-state">Selecciona un lubricante.</div>`;
-  const visual = lubricanteVisual(l.tipo);
-  const tieneFicha = Boolean(l.ficha_tecnica_data_url);
-  const fichaEsImagen = String(l.ficha_tecnica_tipo || "").startsWith("image/");
-  const usos = usoLubricante(l);
-  const equiposAsociados = new Set(usos.map(u => u.equipo_id).filter(Boolean));
-  const filasUso = usos.slice(0, 40).map(u => {
-    const eq = state.equipos.find(e => e.id === u.equipo_id);
+function inventarioTexto(presentaciones) {
+  const conEnvases = presentaciones.filter(p => Number(p.num_envases) > 0);
+  if (!conEnvases.length) return "Sin registrar";
+  return conEnvases.map(p => `${p.num_envases} ${p.nombre}`).join(", ");
+}
+
+function renderTabEquipos(l, rows) {
+  const filas = rows.map(le => {
+    const eq = state.equipos.find(e => e.id === le.equipo_id);
     return `<tr>
-      <td>${escapeHtml(eq?.nombre_equipo || eq?.id_tag || "Equipo sin identificar")}</td>
-      <td>${escapeHtml(u.nombre || u.elemento || "-")}</td>
+      <td>${escapeHtml(eq?.nombre_equipo || eq?.id_tag || "Equipo eliminado")}</td>
+      <td>${escapeHtml(le.componente || "-")}</td>
+      <td>${escapeHtml(le.punto_lubricacion || "-")}</td>
       <td>${escapeHtml(eq?.area || "-")}</td>
-      <td>${escapeHtml(u.frecuencia || "-")}</td>
+      <td>${escapeHtml(le.cantidad_aplicada || "-")}</td>
+      <td>${escapeHtml(le.frecuencia || "-")}</td>
+      <td class="lube-uso-table-actions">${isSupervisorMode() ? `<button class="icon-danger-button" onclick="eliminarAsociacionEquipo('${le.id}')" title="Quitar">×</button>` : ""}</td>
     </tr>`;
   }).join("");
 
+  const equiposOrdenados = [...state.equipos].sort((a, b) =>
+    String(a.area || "").localeCompare(String(b.area || "")) || String(a.nombre_equipo || "").localeCompare(String(b.nombre_equipo || "")));
+
   return `
-    <div class="lube-detail-hero">
-      <div class="lube-detail-icon ${visual.clase} ${l.foto_producto_data_url ? "has-photo" : ""}">${lubricanteIconHtml(l, visual)}</div>
+    ${isSupervisorMode() ? `
+      <button onclick="toggleAsociarEquipoForm()">${state.lubricanteAsociarFormAbierto ? "✕ Cerrar" : "+ Asociar equipo"}</button>
+      ${state.lubricanteAsociarFormAbierto ? `
+        <div class="lube-form-panel">
+          <div class="two-cols">
+            <label>Equipo<select id="assoc-equipo">
+              ${equiposOrdenados.map(e => `<option value="${escapeHtml(e.id)}">${escapeHtml(e.area || "Sin área")} · ${escapeHtml(e.nombre_equipo || e.id_tag || "Equipo")}</option>`).join("")}
+            </select></label>
+            <label>Componente<input id="assoc-componente" placeholder="Ej: Chumacera, motor, reductor..."></label>
+          </div>
+          <div class="two-cols">
+            <label>Punto de lubricación<input id="assoc-punto" placeholder="Ej: Lado motor, entrada, salida..."></label>
+            <label>Cantidad aplicada<input id="assoc-cantidad" placeholder="Ej: 40 g, 0.5 L..."></label>
+          </div>
+          <label>Frecuencia<select id="assoc-frecuencia">
+            <option>Diario</option><option>Semanal</option><option>Quincenal</option><option selected>Mensual</option><option>Trimestral</option><option>Semestral</option><option>Anual</option>
+          </select></label>
+          <div class="form-action"><button onclick="guardarAsociacionEquipo('${l.id}')">Asociar equipo</button></div>
+        </div>
+      ` : ""}
+    ` : ""}
+    ${rows.length ? `
+      <div class="lube-uso-table-wrap">
+        <table class="lube-uso-table">
+          <thead><tr><th>Equipo</th><th>Componente</th><th>Punto</th><th>Área</th><th>Cantidad</th><th>Frecuencia</th><th></th></tr></thead>
+          <tbody>${filas}</tbody>
+        </table>
+      </div>
+    ` : `<div class="empty-state small">Este lubricante todavía no está asociado a ningún equipo.</div>`}
+  `;
+}
+
+function toggleAsociarEquipoForm() {
+  state.lubricanteAsociarFormAbierto = !state.lubricanteAsociarFormAbierto;
+  renderModules();
+}
+
+async function guardarAsociacionEquipo(lubricanteId) {
+  if (!isSupervisorMode()) return;
+  const equipoId = $("assoc-equipo")?.value;
+  if (!equipoId) {
+    mostrarAvisoFlotante("Selecciona un equipo.", "error");
+    return;
+  }
+  const { error } = await sb.from(cfg.tables.lubricanteEquipos).insert({
+    empresa_id: state.empresaId,
+    lubricante_id: lubricanteId,
+    equipo_id: equipoId,
+    componente: $("assoc-componente")?.value.trim() || null,
+    punto_lubricacion: $("assoc-punto")?.value.trim() || null,
+    cantidad_aplicada: $("assoc-cantidad")?.value.trim() || null,
+    frecuencia: $("assoc-frecuencia")?.value || null
+  });
+  if (error) {
+    mostrarAvisoFlotante(`No se pudo asociar el equipo: ${error.message}. Corre el Paso 26 si aún no lo has corrido.`, "error");
+    return;
+  }
+  state.lubricanteAsociarFormAbierto = false;
+  await loadLubricanteEquipos();
+  renderModules();
+  mostrarAvisoFlotante("Equipo asociado.", "ok");
+}
+
+async function eliminarAsociacionEquipo(id) {
+  if (!isSupervisorMode()) return;
+  if (!window.confirm("¿Quitar esta asociación?")) return;
+  const { data, error } = await sb.from(cfg.tables.lubricanteEquipos).delete().eq("id", id).select("id");
+  if (!error && (!data || data.length === 0)) {
+    mostrarAvisoFlotante("Falta el permiso de borrado en Supabase (Paso 26).", "error");
+    return;
+  }
+  if (error) {
+    mostrarAvisoFlotante(`No se pudo quitar: ${error.message}`, "error");
+    return;
+  }
+  await loadLubricanteEquipos();
+  renderModules();
+  mostrarAvisoFlotante("Asociación eliminada.", "ok");
+}
+
+function renderTabPresentaciones(l, presentaciones) {
+  const filas = presentaciones.map(p => `
+    <tr>
+      <td>${escapeHtml(p.nombre)}${p.es_principal ? ` <span class="pill">Principal</span>` : ""}</td>
+      <td>${p.cantidad ? escapeHtml(p.cantidad) : "-"} ${escapeHtml(p.unidad || "")}</td>
+      <td class="lube-uso-table-actions">${isSupervisorMode() ? `<button class="icon-danger-button" onclick="eliminarPresentacion('${p.id}')" title="Eliminar">×</button>` : ""}</td>
+    </tr>`).join("");
+
+  return `
+    ${isSupervisorMode() ? `
+      <button onclick="toggleAgregarPresentacionForm()">${state.lubricantePresentacionFormAbierto ? "✕ Cerrar" : "+ Agregar presentación"}</button>
+      ${state.lubricantePresentacionFormAbierto ? `
+        <div class="lube-form-panel">
+          <div class="two-cols">
+            <label>Nombre<input id="pres-nombre" placeholder="Ej: Cubeta, Tambor, Cartucho..."></label>
+            <label>Cantidad<input id="pres-cantidad" type="number" step="any" placeholder="Ej: 16"></label>
+          </div>
+          <div class="two-cols">
+            <label>Unidad<select id="pres-unidad"><option>kg</option><option>L</option><option>g</option><option>mL</option><option>cartucho</option><option>pieza</option></select></label>
+            <label class="lube-checkbox-field"><input id="pres-principal" type="checkbox"> Es la que compra la planta</label>
+          </div>
+          <div class="form-action"><button onclick="guardarPresentacionLubricante('${l.id}')">Guardar presentación</button></div>
+        </div>
+      ` : ""}
+    ` : ""}
+    ${presentaciones.length ? `
+      <div class="lube-uso-table-wrap"><table class="lube-uso-table"><thead><tr><th>Presentación</th><th>Cantidad</th><th></th></tr></thead><tbody>${filas}</tbody></table></div>
+    ` : `<div class="empty-state small">Todavía no hay presentaciones registradas para este producto.</div>`}
+  `;
+}
+
+function toggleAgregarPresentacionForm() {
+  state.lubricantePresentacionFormAbierto = !state.lubricantePresentacionFormAbierto;
+  renderModules();
+}
+
+async function guardarPresentacionLubricante(lubricanteId) {
+  if (!isSupervisorMode()) return;
+  const nombre = $("pres-nombre")?.value.trim();
+  const cantidad = $("pres-cantidad")?.value;
+  const unidad = $("pres-unidad")?.value || "kg";
+  const principal = $("pres-principal")?.checked || false;
+  if (!nombre) {
+    mostrarAvisoFlotante("Escribe el nombre de la presentación.", "error");
+    return;
+  }
+  const { data, error } = await sb.from(cfg.tables.lubricantePresentaciones).insert({
+    empresa_id: state.empresaId,
+    lubricante_id: lubricanteId,
+    nombre,
+    cantidad: cantidad ? Number(cantidad) : null,
+    unidad,
+    es_principal: principal,
+    num_envases: 0,
+    inventario_minimo: 0
+  }).select("id").single();
+
+  if (error) {
+    mostrarAvisoFlotante(`No se pudo guardar: ${error.message}. Corre el Paso 26 si aún no lo has corrido.`, "error");
+    return;
+  }
+  if (principal && data?.id) {
+    await sb.from(cfg.tables.lubricantePresentaciones).update({ es_principal: false }).eq("lubricante_id", lubricanteId).neq("id", data.id);
+  }
+  state.lubricantePresentacionFormAbierto = false;
+  await loadLubricantePresentaciones();
+  renderModules();
+  mostrarAvisoFlotante("Presentación guardada.", "ok");
+}
+
+async function eliminarPresentacion(id) {
+  if (!isSupervisorMode()) return;
+  if (!window.confirm("¿Eliminar esta presentación?")) return;
+  const { data, error } = await sb.from(cfg.tables.lubricantePresentaciones).delete().eq("id", id).select("id");
+  if (!error && (!data || data.length === 0)) {
+    mostrarAvisoFlotante("Falta el permiso de borrado en Supabase (Paso 26).", "error");
+    return;
+  }
+  if (error) {
+    mostrarAvisoFlotante(`No se pudo eliminar: ${error.message}`, "error");
+    return;
+  }
+  await loadLubricantePresentaciones();
+  renderModules();
+  mostrarAvisoFlotante("Presentación eliminada.", "ok");
+}
+
+function renderTabInventario(presentaciones) {
+  if (!presentaciones.length) {
+    return `<div class="empty-state small">Registra al menos una presentación en la pestaña "Presentaciones" para llevar su inventario.</div>`;
+  }
+  const filas = presentaciones.map(p => {
+    const total = (Number(p.num_envases) || 0) * (Number(p.cantidad) || 0);
+    const bajo = Number(p.inventario_minimo || 0) > 0 && Number(p.num_envases || 0) <= Number(p.inventario_minimo || 0);
+    return `<tr class="${bajo ? "lube-inv-bajo" : ""}">
+      <td>${escapeHtml(p.nombre)}</td>
+      <td>${isSupervisorMode()
+        ? `<input class="lube-inv-input" type="number" step="any" value="${escapeHtml(p.num_envases || 0)}" onchange="actualizarInventario('${p.id}','num_envases',this.value)">`
+        : escapeHtml(p.num_envases || 0)}</td>
+      <td>${escapeHtml(total)} ${escapeHtml(p.unidad || "")}</td>
+      <td>${isSupervisorMode()
+        ? `<input class="lube-inv-input" type="number" step="any" value="${escapeHtml(p.inventario_minimo || 0)}" onchange="actualizarInventario('${p.id}','inventario_minimo',this.value)">`
+        : escapeHtml(p.inventario_minimo || 0)}</td>
+      <td>${bajo ? `<span class="status-pill error">⚠ Bajo mínimo</span>` : `<span class="status-pill ok">OK</span>`}</td>
+    </tr>`;
+  }).join("");
+  return `<div class="lube-uso-table-wrap"><table class="lube-uso-table"><thead><tr><th>Presentación</th><th>Envases</th><th>Total</th><th>Mínimo</th><th>Estado</th></tr></thead><tbody>${filas}</tbody></table></div>`;
+}
+
+async function actualizarInventario(presentacionId, campo, valor) {
+  if (!isSupervisorMode()) return;
+  const { error } = await sb.from(cfg.tables.lubricantePresentaciones).update({ [campo]: Number(valor) || 0 }).eq("id", presentacionId);
+  if (error) {
+    mostrarAvisoFlotante(`No se pudo actualizar: ${error.message}`, "error");
+    return;
+  }
+  await loadLubricantePresentaciones();
+  renderModules();
+}
+
+function renderDocSlot(l, prefix, titulo) {
+  const nombre = l[`${prefix}_nombre`];
+  const tipo = l[`${prefix}_tipo`];
+  const url = l[`${prefix}_data_url`];
+  const esImagen = String(tipo || "").startsWith("image/");
+  return `
+    <div class="lube-doc-card">
+      <strong>${titulo}</strong>
+      ${url ? (esImagen
+        ? `<div class="detail-photos"><img src="${escapeHtml(url)}" alt="${escapeHtml(nombre || titulo)}" onclick="window.open(this.src,'_blank')"></div>`
+        : `<a class="lube-file-chip" href="${escapeHtml(url)}" target="_blank" rel="noopener"><span>📄</span>${escapeHtml(nombre || "Ver documento")}</a>`)
+        : `<span class="muted">Sin documento cargado.</span>`}
+      ${isSupervisorMode() ? `<label class="lube-doc-upload">Reemplazar<input type="file" accept="application/pdf,image/*" onchange="subirDocumentoLubricante('${l.id}','${prefix}',this)"></label>` : ""}
+    </div>`;
+}
+
+function renderTabDocumentacion(l) {
+  return `<div class="lube-doc-grid">${renderDocSlot(l, "ficha_tecnica", "📄 Ficha técnica")}${renderDocSlot(l, "msds", "☣️ MSDS / Hoja de seguridad")}</div>`;
+}
+
+async function subirDocumentoLubricante(lubricanteId, prefix, input) {
+  const file = input?.files?.[0];
+  if (!file) return;
+  if (!(file.type === "application/pdf" || file.type.startsWith("image/"))) {
+    mostrarAvisoFlotante("Debe ser un PDF o una imagen.", "error");
+    return;
+  }
+  if (file.size > 4500000) {
+    mostrarAvisoFlotante("Ese archivo pesa demasiado, usa uno menor a 4.5 MB.", "error");
+    return;
+  }
+  const dataUrl = await fileToDataUrl(file);
+  const payload = { [`${prefix}_nombre`]: file.name, [`${prefix}_tipo`]: file.type, [`${prefix}_data_url`]: dataUrl };
+  const { error } = await sb.from(cfg.tables.lubricantes).update(payload).eq("id", lubricanteId);
+  if (error) {
+    mostrarAvisoFlotante(`No se pudo subir: ${error.message}. Corre el Paso 26 si aún no lo has corrido.`, "error");
+    return;
+  }
+  await loadLubricantes();
+  renderModules();
+  mostrarAvisoFlotante("Documento actualizado.", "ok");
+}
+
+function renderTabConsumos() {
+  return `<div class="empty-state small">Todavía no llevamos un registro de consumos por movimiento. Cuando definamos cómo capturar cada aplicación (técnico, fecha y cantidad), el historial se mostrará aquí.</div>`;
+}
+
+function renderDetalleLubricante() {
+  const l = state.lubricantes.find(item => String(item.id) === String(state.selectedLubricanteId));
+  if (!l) return `<div class="empty-state">Selecciona un lubricante.</div>`;
+  const visual = lubricanteVisual(l.tipo);
+  const equiposRows = equiposAsociadosDe(l.id);
+  const equiposUnicos = new Set(equiposRows.map(e => e.equipo_id));
+  const presentaciones = presentacionesDe(l.id);
+  const presPrincipal = presentacionPrincipal(l.id);
+  const tab = state.lubricanteTab || "equipos";
+
+  return `
+    <div class="lube-page-head">
+      <button class="ghost-action" onclick="volverListaLubricantes()">← Volver al catálogo</button>
+      ${isSupervisorMode() ? `
+        <div class="lube-page-actions">
+          <button class="ghost-action" onclick="editarLubricante('${l.id}')">✎ Editar</button>
+          <button class="reject-action" onclick="eliminarLubricante('${l.id}')">Eliminar</button>
+        </div>` : ""}
+    </div>
+    <div class="lube-detail-layout">
+      <div class="lube-detail-icon lube-detail-icon-lg ${visual.clase} ${l.foto_producto_data_url ? "has-photo" : ""}">${lubricanteIconHtml(l, visual)}</div>
       <div class="lube-detail-heading">
         <span class="lube-detail-brand">${escapeHtml(l.marca || "MOLUB")}</span>
         <h2>${escapeHtml(l.nombre)}</h2>
+        ${l.descripcion ? `<p class="lube-detail-desc">${escapeHtml(l.descripcion)}</p>` : ""}
         <div class="lube-detail-badges">
           <span class="status-pill">${escapeHtml(l.tipo || "Grasa")}</span>
           ${l.especificacion ? `<span class="pill">${escapeHtml(l.especificacion)}</span>` : ""}
+          ${l.codigo ? `<span class="pill">SKU ${escapeHtml(l.codigo)}</span>` : ""}
         </div>
       </div>
-    </div>
-    <div class="lube-stats">
-      <div class="lube-stat"><span>🏷️ Marca</span><strong>${escapeHtml(l.marca || "Sin marca")}</strong></div>
-      <div class="lube-stat"><span>🧪 Tipo</span><strong>${escapeHtml(l.tipo || "Grasa")}</strong></div>
-      <div class="lube-stat"><span>📐 Especificación</span><strong>${escapeHtml(l.especificacion || "Sin especificar")}</strong></div>
-      <div class="lube-stat"><span>⚙️ Equipos asociados</span><strong>${equiposAsociados.size}</strong></div>
-      <div class="lube-stat"><span>📍 Puntos de lubricación</span><strong>${usos.length}</strong></div>
+      <div class="lube-stats lube-stats-col">
+        <div class="lube-stat"><span>📦 Presentación en planta</span><strong>${presPrincipal ? escapeHtml(presentacionTexto(presPrincipal)) : "Sin definir"}</strong></div>
+        <div class="lube-stat"><span>⚙️ Equipos asociados</span><strong>${equiposUnicos.size}</strong></div>
+        <div class="lube-stat"><span>📍 Puntos de lubricación</span><strong>${equiposRows.length}</strong></div>
+        <div class="lube-stat"><span>📦 Inventario actual</span><strong>${inventarioTexto(presentaciones)}</strong></div>
+      </div>
     </div>
     ${l.nota ? `<div class="detail-section-title">🗒 Nota</div><div class="detail-text">${escapeHtml(l.nota)}</div>` : ""}
-    ${tieneFicha ? `
-      <div class="detail-section-title">📎 Ficha técnica / presentación</div>
-      ${fichaEsImagen
-        ? `<div class="detail-photos"><img src="${escapeHtml(l.ficha_tecnica_data_url)}" alt="${escapeHtml(l.ficha_tecnica_nombre || "Ficha técnica")}" onclick="window.open(this.src, '_blank')"></div>`
-        : `<a class="lube-file-chip" href="${escapeHtml(l.ficha_tecnica_data_url)}" target="_blank" rel="noopener"><span>📄</span>${escapeHtml(l.ficha_tecnica_nombre || "Ver ficha técnica (PDF)")}</a>`}
-    ` : ""}
-    <div class="detail-section-title">🧰 Dónde se usa</div>
-    ${usos.length ? `
-      <div class="lube-uso-table-wrap">
-        <table class="lube-uso-table">
-          <thead><tr><th>Equipo</th><th>Punto</th><th>Área</th><th>Frecuencia</th></tr></thead>
-          <tbody>${filasUso}</tbody>
-        </table>
-      </div>
-      ${usos.length > 40 ? `<small class="muted">Mostrando 40 de ${usos.length} puntos.</small>` : ""}
-    ` : `<div class="empty-state small">Este lubricante todavía no aparece en ningún punto de las cartas guardadas.</div>`}
-    <div class="modal-actions">
-      <button class="ghost-action" onclick="cerrarModal()">Cerrar</button>
-      ${isSupervisorMode() ? `<button class="ghost-action" onclick="editarLubricante('${escapeHtml(l.id)}')">✎ Editar</button>` : ""}
-      ${isSupervisorMode() ? `<button class="reject-action" onclick="eliminarLubricante('${escapeHtml(l.id)}')">Eliminar</button>` : ""}
+    <div class="lube-tabs">
+      ${["equipos", "presentaciones", "inventario", "documentacion", "consumos"].map(t =>
+        `<button class="lube-tab ${tab === t ? "active" : ""}" onclick="cambiarTabLubricante('${t}')">${tabLabelLubricante(t)}</button>`
+      ).join("")}
+    </div>
+    <div class="lube-tab-content">
+      ${tab === "equipos" ? renderTabEquipos(l, equiposRows) : ""}
+      ${tab === "presentaciones" ? renderTabPresentaciones(l, presentaciones) : ""}
+      ${tab === "inventario" ? renderTabInventario(presentaciones) : ""}
+      ${tab === "documentacion" ? renderTabDocumentacion(l) : ""}
+      ${tab === "consumos" ? renderTabConsumos() : ""}
     </div>`;
 }
 
 async function eliminarLubricante(id) {
   if (!isSupervisorMode()) return;
-  if (!window.confirm("¿Eliminar este lubricante del catálogo?")) return;
+  if (!window.confirm("¿Eliminar este lubricante del catálogo? También se quitarán sus presentaciones y asociaciones con equipos.")) return;
 
   const { data, error } = await sb.from(cfg.tables.lubricantes).delete().eq("id", id).select("id");
   if (!error && (!data || data.length === 0)) {
@@ -982,8 +1357,9 @@ async function eliminarLubricante(id) {
   }
 
   await loadLubricantes();
-  renderModules();
-  cerrarModal();
+  await loadLubricanteEquipos();
+  await loadLubricantePresentaciones();
+  volverListaLubricantes();
   mostrarAvisoFlotante("Lubricante eliminado.", "ok");
 }
 
@@ -2780,6 +3156,7 @@ function renderModules() {
               <span class="muted">${state.levantamientoLoading ? "Cargando fotos..." : `${fotos.length} fotos`}</span>
             </div>
             ${state.levantamiento?.descripcion ? `<p>${escapeHtml(state.levantamiento.descripcion)}</p>` : ""}
+            ${renderLubricantesDeEquipo(equipo.id)}
             <div class="photo-grid" aria-label="Fotos de levantamiento">${state.levantamientoLoading ? `<div class="photo-empty wide">Cargando evidencia...</div>` : fotosHtml}</div>
           </div>
           <div class="photo-uploader">
@@ -3062,9 +3439,16 @@ function renderModules() {
         return;
       }
       if (id === "lubricantes") {
+        if (state.lubricanteDetailMode) {
+          view.querySelector(".module-panel").innerHTML = `<div class="module-wide">${renderDetalleLubricante()}</div>`;
+          return;
+        }
+
         const lubricantes = lubricantesFiltrados();
         const lubricantesHtml = lubricantes.length ? lubricantes.map(l => {
           const visual = lubricanteVisual(l.tipo);
+          const equiposCount = new Set(equiposAsociadosDe(l.id).map(e => e.equipo_id)).size;
+          const presPrincipal = presentacionPrincipal(l.id);
           return `
           <article class="lubricante-card" onclick="seleccionarLubricante('${escapeHtml(l.id)}')">
             <div class="lubricante-card-icon ${visual.clase} ${l.foto_producto_data_url ? "has-photo" : ""}">${lubricanteIconHtml(l, visual)}</div>
@@ -3072,11 +3456,12 @@ function renderModules() {
               <span class="lubricante-card-tipo">${escapeHtml(l.tipo || "Grasa")}</span>
               <strong>${escapeHtml(l.nombre)}</strong>
               <span class="lubricante-card-marca">${escapeHtml(l.marca || "Sin marca")}</span>
-              ${l.especificacion ? `<span class="lubricante-card-spec">${escapeHtml(l.especificacion)}</span>` : ""}
+              ${presPrincipal ? `<span class="lubricante-card-spec">${escapeHtml(presentacionTexto(presPrincipal))}</span>` : ""}
+              <span class="lubricante-card-equipos">⚙️ ${equiposCount} equipo${equiposCount === 1 ? "" : "s"} asociado${equiposCount === 1 ? "" : "s"}</span>
             </div>
-            ${l.ficha_tecnica_data_url ? `<span class="lubricante-card-ficha" title="Tiene ficha técnica adjunta">📎</span>` : ""}
+            ${(l.ficha_tecnica_data_url || l.msds_data_url) ? `<span class="lubricante-card-ficha" title="Tiene documentos adjuntos">📎</span>` : ""}
           </article>`;
-        }).join("") : `<div class="empty-state">${state.lubricantes.length ? "Sin resultados con esta búsqueda." : "Todavía no hay lubricantes dados de alta para esta empresa."}</div>`;
+        }).join("") : `<div class="empty-state">${state.lubricantes.length ? "Sin resultados con estos filtros." : "Todavía no hay lubricantes dados de alta para esta empresa."}</div>`;
 
         const editando = state.editandoLubricanteId ? state.lubricantes.find(item => String(item.id) === String(state.editandoLubricanteId)) : null;
         const formAbierto = isSupervisorMode() && (state.lubricanteFormAbierto || Boolean(editando));
@@ -3089,23 +3474,27 @@ function renderModules() {
                 <h2>Catálogo de lubricantes</h2>
                 <span class="muted">${lubricantes.length} de ${state.lubricantes.length} registros</span>
               </div>
-              ${isSupervisorMode() ? `<button onclick="toggleLubricanteForm()">${formAbierto ? "✕ Cerrar" : "+ Nuevo lubricante"}</button>` : ""}
+              ${isSupervisorMode() ? `<button onclick="toggleLubricanteForm()">${formAbierto ? "✕ Cerrar" : "+ Agregar lubricante"}</button>` : ""}
             </div>
             ${formAbierto ? `
               <section class="lube-form-panel">
                 <h3>${editando ? `Editar: ${escapeHtml(editando.nombre)}` : "Dar de alta lubricante"}</h3>
                 <div class="form-preview">
-                  <label>Nombre<input id="lub-nombre" placeholder="Ej: Synlox Xtreme Syn Grado 2" value="${escapeHtml(editando?.nombre || "")}"></label>
+                  <div class="two-cols">
+                    <label>Nombre<input id="lub-nombre" placeholder="Ej: Synlox Xtreme Syn Grado 2" value="${escapeHtml(editando?.nombre || "")}"></label>
+                    <label>Marca<input id="lub-marca" placeholder="Ej: Molub" value="${escapeHtml(editando?.marca || "")}"></label>
+                  </div>
                   <div class="two-cols">
                     <label>Tipo<select id="lub-tipo">
                       <option ${(!editando || editando.tipo === "Grasa") ? "selected" : ""}>Grasa</option>
                       <option ${editando?.tipo === "Aceite" ? "selected" : ""}>Aceite</option>
                       <option ${editando?.tipo === "Otro" ? "selected" : ""}>Otro</option>
                     </select></label>
-                    <label>Marca<input id="lub-marca" placeholder="Ej: Molub" value="${escapeHtml(editando?.marca || "")}"></label>
+                    <label>Código / SKU<input id="lub-codigo" placeholder="Ej: SYN-XTR-220" value="${escapeHtml(editando?.codigo || "")}"></label>
                   </div>
                   <label>Especificación<input id="lub-especificacion" placeholder="Ej: ISO 220, NLGI 2..." value="${escapeHtml(editando?.especificacion || "")}"></label>
-                  <label>Nota<textarea id="lub-nota" placeholder="Uso recomendado, equivalencias, observaciones...">${escapeHtml(editando?.nota || "")}</textarea></label>
+                  <label>Descripción<textarea id="lub-descripcion" placeholder="Descripción corta del producto y su uso principal...">${escapeHtml(editando?.descripcion || "")}</textarea></label>
+                  <label>Observaciones<textarea id="lub-nota" placeholder="Uso recomendado, equivalencias, observaciones...">${escapeHtml(editando?.nota || "")}</textarea></label>
                   <div class="two-cols">
                     <label>Foto del producto (imagen)<input id="lub-foto" type="file" accept="image/*" onchange="previewFotoProductoLubricante(this)"></label>
                     <label>Ficha técnica (PDF o imagen)<input id="lub-ficha" type="file" accept="application/pdf,image/*" onchange="previewFichaLubricante(this)"></label>
@@ -3114,6 +3503,8 @@ function renderModules() {
                     <div id="lub-foto-preview">${editando?.foto_producto_data_url ? `<div class="closure-photo"><img src="${escapeHtml(editando.foto_producto_data_url)}" alt="Foto actual"><small>Sube otra imagen para reemplazarla</small></div>` : ""}</div>
                     <div id="lub-ficha-preview">${editando?.ficha_tecnica_nombre ? `<div class="closure-photo"><small>📎 Ya tiene: ${escapeHtml(editando.ficha_tecnica_nombre)} (sube otro archivo para reemplazarla)</small></div>` : ""}</div>
                   </div>
+                  <label>MSDS / Hoja de seguridad (PDF o imagen)<input id="lub-msds" type="file" accept="application/pdf,image/*" onchange="previewMsdsLubricante(this)"></label>
+                  <div id="lub-msds-preview">${editando?.msds_nombre ? `<div class="closure-photo"><small>📎 Ya tiene: ${escapeHtml(editando.msds_nombre)} (sube otro archivo para reemplazarla)</small></div>` : ""}</div>
                   <div class="form-action">
                     ${editando ? `<button class="ghost-action" onclick="cancelarEdicionLubricante()">Cancelar</button>` : ""}
                     <button onclick="guardarLubricante()">${editando ? "Guardar cambios" : "Dar de alta"}</button>
@@ -3122,7 +3513,20 @@ function renderModules() {
               </section>
             ` : ""}
             <div class="list-toolbar">
-              <input value="${escapeHtml(state.lubricanteSearch)}" oninput="buscarLubricantes(this.value)" placeholder="Buscar por nombre, tipo, marca o especificación...">
+              <input value="${escapeHtml(state.lubricanteSearch)}" oninput="buscarLubricantes(this.value)" placeholder="Buscar por nombre, marca o código...">
+              <select onchange="actualizarFiltroLubricantes('tipo', this.value)">
+                <option value="" ${!state.lubricantesFiltro.tipo ? "selected" : ""}>Todos los tipos</option>
+                <option value="Grasa" ${state.lubricantesFiltro.tipo === "Grasa" ? "selected" : ""}>Grasa</option>
+                <option value="Aceite" ${state.lubricantesFiltro.tipo === "Aceite" ? "selected" : ""}>Aceite</option>
+                <option value="Otro" ${state.lubricantesFiltro.tipo === "Otro" ? "selected" : ""}>Otro</option>
+              </select>
+              <select onchange="actualizarFiltroLubricantes('marca', this.value)">${opcionesDistintas(state.lubricantes, "marca", state.lubricantesFiltro.marca, "Todas las marcas")}</select>
+              <select onchange="actualizarFiltroLubricantes('area', this.value)">${opcionesDistintas(state.equipos, "area", state.lubricantesFiltro.area, "Todas las áreas")}</select>
+              <select onchange="actualizarFiltroLubricantes('estado', this.value)">
+                <option value="" ${!state.lubricantesFiltro.estado ? "selected" : ""}>Activos e inactivos</option>
+                <option value="activo" ${state.lubricantesFiltro.estado === "activo" ? "selected" : ""}>Activos</option>
+                <option value="inactivo" ${state.lubricantesFiltro.estado === "inactivo" ? "selected" : ""}>Inactivos</option>
+              </select>
             </div>
             <div class="lubricantes-grid">${lubricantesHtml}</div>
           </div>`;
