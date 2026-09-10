@@ -713,10 +713,30 @@ async function guardarLubricante() {
   const marca = $("lub-marca")?.value.trim();
   const especificacion = $("lub-especificacion")?.value.trim();
   const nota = $("lub-nota")?.value.trim();
+  const ficha = $("lub-ficha")?.files?.[0];
 
   if (!nombre) {
     mostrarAvisoFlotante("Escribe el nombre del lubricante antes de guardar.", "error");
     return;
+  }
+
+  if (ficha && !(ficha.type === "application/pdf" || ficha.type.startsWith("image/"))) {
+    mostrarAvisoFlotante("La ficha técnica debe ser un PDF o una imagen.", "error");
+    return;
+  }
+
+  if (ficha && ficha.size > 4500000) {
+    mostrarAvisoFlotante("Ese archivo pesa demasiado, usa uno menor a 4.5 MB.", "error");
+    return;
+  }
+
+  let fichaDataUrl = null;
+  let fichaNombre = null;
+  let fichaTipo = null;
+  if (ficha) {
+    fichaDataUrl = await fileToDataUrl(ficha);
+    fichaNombre = ficha.name;
+    fichaTipo = ficha.type;
   }
 
   const { error } = await sb
@@ -727,18 +747,39 @@ async function guardarLubricante() {
       tipo,
       marca: marca || null,
       especificacion: especificacion || null,
-      nota: nota || null
+      nota: nota || null,
+      ficha_tecnica_nombre: fichaNombre,
+      ficha_tecnica_tipo: fichaTipo,
+      ficha_tecnica_data_url: fichaDataUrl
     });
 
   if (error) {
-    mostrarAvisoFlotante(`No se pudo guardar el lubricante: ${error.message}. Corre el Paso 22 si aún no lo has corrido.`, "error");
+    mostrarAvisoFlotante(`No se pudo guardar el lubricante: ${error.message}. Corre el Paso 22/23 si aún no los has corrido.`, "error");
     return;
   }
 
   ["lub-nombre", "lub-marca", "lub-especificacion", "lub-nota"].forEach(id => { if ($(id)) $(id).value = ""; });
+  if ($("lub-ficha")) $("lub-ficha").value = "";
+  if ($("lub-ficha-preview")) $("lub-ficha-preview").innerHTML = "";
   await loadLubricantes();
   renderModules();
   mostrarAvisoFlotante("Lubricante dado de alta.", "ok");
+}
+
+function previewFichaLubricante(input) {
+  const preview = $("lub-ficha-preview");
+  const file = input?.files?.[0];
+  if (!preview || !file) return;
+
+  if (!(file.type === "application/pdf" || file.type.startsWith("image/"))) {
+    preview.innerHTML = `<div class="empty-state small">Selecciona un PDF o una imagen.</div>`;
+    return;
+  }
+  if (file.size > 4500000) {
+    preview.innerHTML = `<div class="empty-state small">Ese archivo pesa demasiado, usa uno menor a 4.5 MB.</div>`;
+    return;
+  }
+  preview.innerHTML = `<div class="closure-photo"><small>📎 ${escapeHtml(file.name)}</small></div>`;
 }
 
 function seleccionarLubricante(id) {
@@ -759,6 +800,12 @@ function renderPanelLubricante() {
       ${campoDetalle("Especificación", l.especificacion || "-")}
     </div>
     ${l.nota ? `<div class="detail-section-title">🗒 Nota</div><div class="detail-text">${escapeHtml(l.nota)}</div>` : ""}
+    ${l.ficha_tecnica_data_url ? `
+      <div class="detail-section-title">📎 Ficha técnica / presentación</div>
+      ${String(l.ficha_tecnica_tipo || "").startsWith("image/")
+        ? `<div class="detail-photos"><img src="${escapeHtml(l.ficha_tecnica_data_url)}" alt="${escapeHtml(l.ficha_tecnica_nombre || "Ficha técnica")}" onclick="window.open(this.src, '_blank')"></div>`
+        : `<a class="ghost-action" style="display:inline-block;text-decoration:none" href="${escapeHtml(l.ficha_tecnica_data_url)}" target="_blank" rel="noopener">Ver ${escapeHtml(l.ficha_tecnica_nombre || "ficha técnica (PDF)")}</a>`}
+    ` : ""}
     <div class="modal-actions">
       <button class="ghost-action" onclick="cerrarModal()">Cerrar</button>
       ${isSupervisorMode() ? `<button class="reject-action" onclick="eliminarLubricante('${escapeHtml(l.id)}')">Eliminar</button>` : ""}
@@ -2922,6 +2969,8 @@ function renderModules() {
                   </div>
                   <label>Especificación<input id="lub-especificacion" placeholder="Ej: ISO 220, NLGI 2..."></label>
                   <label>Nota<textarea id="lub-nota" placeholder="Uso recomendado, equivalencias, observaciones..."></textarea></label>
+                  <label>Ficha técnica o presentación (PDF o imagen)<input id="lub-ficha" type="file" accept="application/pdf,image/*" onchange="previewFichaLubricante(this)"></label>
+                  <div id="lub-ficha-preview"></div>
                   <div class="form-action"><button onclick="guardarLubricante()">Dar de alta</button></div>
                 </div>
               </section>
