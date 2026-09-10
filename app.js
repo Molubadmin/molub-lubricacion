@@ -18,6 +18,8 @@ const state = {
   lubricanteTab: "equipos",
   lubricanteAsociarFormAbierto: false,
   lubricantePresentacionFormAbierto: false,
+  lubricanteAliasPickerAbierto: false,
+  lubricanteAliasOpciones: [],
   editandoLubricanteId: "",
   lubricanteFormAbierto: false,
   lubricanteSearch: "",
@@ -931,15 +933,54 @@ async function guardarLubricante() {
   }
 }
 
+function terminosBusquedaLubricante(l) {
+  const alias = String(l.alias_cartas || "").split(",").map(s => s.trim()).filter(Boolean);
+  return [l.nombre, ...alias].map(t => String(t || "").trim().toLowerCase()).filter(Boolean);
+}
+
+function textosLubricanteEnCartas() {
+  const conteo = new Map();
+  state.elementosCartas.forEach(el => {
+    if (!el.equipo_id) return;
+    const v = String(el.lubricante || "").trim();
+    if (!v) return;
+    conteo.set(v, (conteo.get(v) || 0) + 1);
+  });
+  return [...conteo.entries()].sort((a, b) => b[1] - a[1]);
+}
+
+async function agregarAliasLubricante(lubricanteId, texto) {
+  if (!isSupervisorMode() || !texto) return;
+  const l = state.lubricantes.find(item => String(item.id) === String(lubricanteId));
+  if (!l) return;
+  const actuales = String(l.alias_cartas || "").split(",").map(s => s.trim()).filter(Boolean);
+  if (!actuales.some(a => a.toLowerCase() === texto.toLowerCase())) {
+    actuales.push(texto);
+    const { error } = await sb.from(cfg.tables.lubricantes).update({ alias_cartas: actuales.join(", ") }).eq("id", lubricanteId);
+    if (error) {
+      mostrarAvisoFlotante(`No se pudo guardar el alias: ${error.message}. Corre el Paso 27 si aún no lo has corrido.`, "error");
+      return;
+    }
+    await loadLubricantes();
+  }
+  await autoAsociarEquiposLubricante(lubricanteId);
+}
+
+function toggleAliasPicker() {
+  state.lubricanteAliasPickerAbierto = !state.lubricanteAliasPickerAbierto;
+  renderModules();
+}
+
 async function autoAsociarEquiposLubricante(lubricanteId, opciones = {}) {
   const l = state.lubricantes.find(item => String(item.id) === String(lubricanteId));
   if (!l) return;
-  const nombre = String(l.nombre || "").trim().toLowerCase();
-  if (!nombre) return;
+  const terminos = terminosBusquedaLubricante(l);
+  if (!terminos.length) return;
 
   const coincidencias = state.elementosCartas.filter(el => {
     const valor = String(el.lubricante || "").trim().toLowerCase();
-    return valor && el.equipo_id && (valor === nombre || valor.includes(nombre) || nombre.includes(valor));
+    if (!valor || !el.equipo_id) return false;
+    return terminos.some(t => valor === t || valor.includes(t) || t.includes(valor));
   });
 
   const existentes = new Set(equiposAsociadosDe(lubricanteId).map(le => `${le.equipo_id}|${le.punto_lubricacion || ""}`));
@@ -962,7 +1003,11 @@ async function autoAsociarEquiposLubricante(lubricanteId, opciones = {}) {
   });
 
   if (!nuevas.length) {
-    if (!opciones.silencioso) mostrarAvisoFlotante("No se encontraron equipos con ese nombre de lubricante en las cartas guardadas.", "info");
+    if (!opciones.silencioso) {
+      state.lubricanteAliasPickerAbierto = true;
+      renderModules();
+      mostrarAvisoFlotante("No hay coincidencias con ese nombre. Elige abajo cómo está escrito en tus cartas.", "info");
+    }
     return;
   }
 
@@ -1027,6 +1072,7 @@ function seleccionarLubricante(id) {
   state.lubricanteTab = "equipos";
   state.lubricanteAsociarFormAbierto = false;
   state.lubricantePresentacionFormAbierto = false;
+  state.lubricanteAliasPickerAbierto = false;
   renderModules();
 }
 
@@ -1040,6 +1086,7 @@ function cambiarTabLubricante(tab) {
   state.lubricanteTab = tab;
   state.lubricanteAsociarFormAbierto = false;
   state.lubricantePresentacionFormAbierto = false;
+  state.lubricanteAliasPickerAbierto = false;
   renderModules();
 }
 
@@ -1095,7 +1142,9 @@ function renderTabEquipos(l, rows) {
       <div class="lube-equipos-actions">
         <button onclick="toggleAsociarEquipoForm()">${state.lubricanteAsociarFormAbierto ? "✕ Cerrar" : "+ Asociar equipo"}</button>
         <button class="ghost-action" onclick="autoAsociarEquiposLubricante('${l.id}')" title="Busca en las cartas guardadas equipos con este mismo nombre de lubricante">🔄 Buscar equipos automáticamente</button>
+        <button class="ghost-action" onclick="toggleAliasPicker()">${state.lubricanteAliasPickerAbierto ? "✕ Cerrar" : "🔤 Elegir nombre como aparece en las cartas"}</button>
       </div>
+      ${renderSelectorAlias(l)}
       ${state.lubricanteAsociarFormAbierto ? `
         <div class="lube-form-panel">
           <div class="two-cols">
@@ -1124,6 +1173,27 @@ function renderTabEquipos(l, rows) {
       </div>
     ` : `<div class="empty-state small">Este lubricante todavía no está asociado a ningún equipo.</div>`}
   `;
+}
+
+function renderSelectorAlias(l) {
+  if (!isSupervisorMode() || !state.lubricanteAliasPickerAbierto) return "";
+  const actuales = String(l.alias_cartas || "").split(",").map(s => s.trim()).filter(Boolean);
+  const opciones = textosLubricanteEnCartas().filter(([texto]) => !actuales.some(a => a.toLowerCase() === texto.toLowerCase()));
+  state.lubricanteAliasOpciones = opciones.map(([texto]) => texto);
+
+  return `
+    <div class="lube-form-panel">
+      <p class="muted lube-alias-hint">Elige el texto que usaron en tus cartas de lubricación para este mismo producto (puede ser distinto al nombre del catálogo). Se guarda como alias y se buscan sus equipos.</p>
+      ${actuales.length ? `<div class="lube-alias-chips">${actuales.map(a => `<span class="pill">✓ ${escapeHtml(a)}</span>`).join("")}</div>` : ""}
+      <div class="lube-alias-list">
+        ${opciones.length ? opciones.map(([texto, count], idx) => `
+          <button type="button" class="lube-alias-option" onclick="agregarAliasLubricante('${l.id}', state.lubricanteAliasOpciones[${idx}])">
+            <span>${escapeHtml(texto)}</span>
+            <small>${count} punto${count === 1 ? "" : "s"}</small>
+          </button>`).join("")
+          : `<div class="empty-state small">No hay más nombres distintos de lubricante en las cartas guardadas.</div>`}
+      </div>
+    </div>`;
 }
 
 function toggleAsociarEquipoForm() {
