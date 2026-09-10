@@ -909,9 +909,9 @@ async function guardarLubricante() {
     msds_data_url: msdsDataUrl
   };
 
-  const { error } = editando
-    ? await sb.from(cfg.tables.lubricantes).update(payload).eq("id", editando.id)
-    : await sb.from(cfg.tables.lubricantes).insert({ ...payload, empresa_id: state.empresaId });
+  const { data: guardado, error } = editando
+    ? await sb.from(cfg.tables.lubricantes).update(payload).eq("id", editando.id).select("id").single()
+    : await sb.from(cfg.tables.lubricantes).insert({ ...payload, empresa_id: state.empresaId }).select("id").single();
 
   if (error) {
     mostrarAvisoFlotante(`No se pudo guardar el lubricante: ${error.message}. Corre el Paso 22/23/25/26 si aún no los has corrido.`, "error");
@@ -925,6 +925,55 @@ async function guardarLubricante() {
   await loadLubricantes();
   renderModules();
   mostrarAvisoFlotante(editando ? "Cambios guardados." : "Lubricante dado de alta.", "ok");
+
+  if (!editando && guardado?.id) {
+    await autoAsociarEquiposLubricante(guardado.id, { silencioso: true });
+  }
+}
+
+async function autoAsociarEquiposLubricante(lubricanteId, opciones = {}) {
+  const l = state.lubricantes.find(item => String(item.id) === String(lubricanteId));
+  if (!l) return;
+  const nombre = String(l.nombre || "").trim().toLowerCase();
+  if (!nombre) return;
+
+  const coincidencias = state.elementosCartas.filter(el => {
+    const valor = String(el.lubricante || "").trim().toLowerCase();
+    return valor && el.equipo_id && (valor === nombre || valor.includes(nombre) || nombre.includes(valor));
+  });
+
+  const existentes = new Set(equiposAsociadosDe(lubricanteId).map(le => `${le.equipo_id}|${le.punto_lubricacion || ""}`));
+  const vistas = new Set();
+  const nuevas = [];
+  coincidencias.forEach(el => {
+    const punto = el.nombre || el.descripcion || "";
+    const clave = `${el.equipo_id}|${punto}`;
+    if (existentes.has(clave) || vistas.has(clave)) return;
+    vistas.add(clave);
+    nuevas.push({
+      empresa_id: state.empresaId,
+      lubricante_id: lubricanteId,
+      equipo_id: el.equipo_id,
+      componente: el.elemento || null,
+      punto_lubricacion: punto || null,
+      cantidad_aplicada: el.gramos ? `${el.gramos} g` : el.litros ? `${el.litros} L` : el.bombazos ? `${el.bombazos} bombazos` : null,
+      frecuencia: el.frecuencia || null
+    });
+  });
+
+  if (!nuevas.length) {
+    if (!opciones.silencioso) mostrarAvisoFlotante("No se encontraron equipos con ese nombre de lubricante en las cartas guardadas.", "info");
+    return;
+  }
+
+  const { error } = await sb.from(cfg.tables.lubricanteEquipos).insert(nuevas);
+  if (error) {
+    if (!opciones.silencioso) mostrarAvisoFlotante(`No se pudo asociar automáticamente: ${error.message}. Corre el Paso 26 si aún no lo has corrido.`, "error");
+    return;
+  }
+  await loadLubricanteEquipos();
+  renderModules();
+  mostrarAvisoFlotante(`Se asociaron ${nuevas.length} punto${nuevas.length === 1 ? "" : "s"} de lubricación automáticamente.`, "ok");
 }
 
 function editarLubricante(id) {
@@ -1043,7 +1092,10 @@ function renderTabEquipos(l, rows) {
 
   return `
     ${isSupervisorMode() ? `
-      <button onclick="toggleAsociarEquipoForm()">${state.lubricanteAsociarFormAbierto ? "✕ Cerrar" : "+ Asociar equipo"}</button>
+      <div class="lube-equipos-actions">
+        <button onclick="toggleAsociarEquipoForm()">${state.lubricanteAsociarFormAbierto ? "✕ Cerrar" : "+ Asociar equipo"}</button>
+        <button class="ghost-action" onclick="autoAsociarEquiposLubricante('${l.id}')" title="Busca en las cartas guardadas equipos con este mismo nombre de lubricante">🔄 Buscar equipos automáticamente</button>
+      </div>
       ${state.lubricanteAsociarFormAbierto ? `
         <div class="lube-form-panel">
           <div class="two-cols">
