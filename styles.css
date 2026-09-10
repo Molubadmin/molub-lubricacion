@@ -1,5 +1,5 @@
 ﻿.qr-loading{display:none}
-.acceso-gate{position:fixed;inset:0;z-index:980;background:url(./assets/login-bg.png?v=2) left center/cover no-repeat,#f4f6fb;padding:48px 16px;overflow-y:auto}
+.acceso-gate{position:fixed;inset:0;z-index:980;background:url(./assets/login-bg.png?v=3) left center/cover no-repeat,#f4f6fb;padding:48px 16px;overflow-y:auto}
 .acceso-gate.hidden{display:none}
 body.gate-activo .sidebar,body.gate-activo .mobile-menu-toggle,body.gate-activo .app{display:none!important}
 .acceso-gate-box{background:#fff;border-radius:22px;padding:40px 38px;max-width:440px;width:100%;margin:0 auto;border:1px solid var(--line);box-shadow:0 24px 60px rgba(7,17,46,.10);text-align:center}
