@@ -12,6 +12,8 @@ const state = {
   elementosCartas: [],
   lubricantes: [],
   selectedLubricanteId: "",
+  editandoLubricanteId: "",
+  lubricanteFormAbierto: false,
   lubricanteSearch: "",
   perfiles: [],
   sessionRole: "SUPERVISOR",
@@ -35,9 +37,9 @@ const state = {
   equiposAreaFiltro: "",
   vistaQr: false,
   puntosOcultosCarta: new Set(),
-  actividadesFiltro: { q: "", tecnico: "", orden: "recientes" },
-  tareasFiltro: { q: "", estado: "", orden: "recientes" },
-  extrasFiltro: { q: "", estado: "", orden: "recientes" },
+  actividadesFiltro: { q: "", estado: "", trabajador: "", orden: "recientes" },
+  tareasFiltro: { q: "", estado: "", trabajador: "", orden: "recientes" },
+  extrasFiltro: { q: "", estado: "", trabajador: "", orden: "recientes" },
   view: "dashboard",
   modulesByCompany: {},
   moduleSource: "local",
@@ -517,28 +519,42 @@ function ordenarPorFecha(rows, orden, camposFecha) {
   });
 }
 
-function filtrarPorTextoYEstado(rows, filtro, camposTexto) {
+function filtrarPorTextoYEstado(rows, filtro, camposTexto, campoTrabajador) {
   const texto = String(filtro.q || "").trim().toLowerCase();
   const estado = filtro.estado || "";
+  const trabajador = filtro.trabajador || "";
   return rows.filter(row => {
     const matchTexto = !texto || camposTexto.map(campo => row[campo] || "").join(" ").toLowerCase().includes(texto);
     const matchEstado = !estado || String(row.status || "").toLowerCase() === estado;
-    return matchTexto && matchEstado;
+    const valorTrabajador = campoTrabajador ? (typeof campoTrabajador === "function" ? campoTrabajador(row) : row[campoTrabajador]) : "";
+    const matchTrabajador = !trabajador || String(valorTrabajador || "") === trabajador;
+    return matchTexto && matchEstado && matchTrabajador;
   });
 }
 
+function opcionesTrabajador(rows, campoOFn, actual) {
+  const nombres = new Set();
+  rows.forEach(row => {
+    const valor = typeof campoOFn === "function" ? campoOFn(row) : row[campoOFn];
+    if (valor) nombres.add(String(valor));
+  });
+  const ordenados = [...nombres].sort((a, b) => a.localeCompare(b));
+  return `<option value="" ${!actual ? "selected" : ""}>Todos los trabajadores</option>` +
+    ordenados.map(n => `<option value="${escapeHtml(n)}" ${actual === n ? "selected" : ""}>${escapeHtml(n)}</option>`).join("");
+}
+
 function tareasFiltradas(rows) {
-  const filtradas = filtrarPorTextoYEstado(rows, state.tareasFiltro, ["actividad", "descripcion", "equipo_texto", "asignado_nombre"]);
+  const filtradas = filtrarPorTextoYEstado(rows, state.tareasFiltro, ["actividad", "descripcion", "equipo_texto", "asignado_nombre"], "asignado_nombre");
   return ordenarPorFecha(filtradas, state.tareasFiltro.orden, ["fecha_envio", "created_at"]);
 }
 
 function actividadesProgramadasFiltradas(rows) {
-  const filtradas = filtrarPorTextoYEstado(rows, state.actividadesFiltro, ["actividad", "descripcion", "equipo_texto", "asignado_nombre"]);
+  const filtradas = filtrarPorTextoYEstado(rows, state.actividadesFiltro, ["actividad", "descripcion", "equipo_texto", "asignado_nombre"], "asignado_nombre");
   return ordenarPorFecha(filtradas, state.actividadesFiltro.orden, ["fecha_envio", "created_at"]);
 }
 
 function extrasFiltradas(rows) {
-  const filtradas = filtrarPorTextoYEstado(rows, state.extrasFiltro, ["descripcion", "equipo_texto", "comentario"]);
+  const filtradas = filtrarPorTextoYEstado(rows, state.extrasFiltro, ["descripcion", "equipo_texto", "comentario"], displayExtraUser);
   return ordenarPorFecha(filtradas, state.extrasFiltro.orden, ["fecha", "created_at"]);
 }
 
@@ -760,28 +776,32 @@ async function guardarLubricante() {
     return;
   }
 
-  let fichaDataUrl = null;
-  let fichaNombre = null;
-  let fichaTipo = null;
+  const editandoId = state.editandoLubricanteId;
+  const editando = editandoId ? state.lubricantes.find(item => String(item.id) === String(editandoId)) : null;
+
+  let fichaDataUrl = editando?.ficha_tecnica_data_url || null;
+  let fichaNombre = editando?.ficha_tecnica_nombre || null;
+  let fichaTipo = editando?.ficha_tecnica_tipo || null;
   if (ficha) {
     fichaDataUrl = await fileToDataUrl(ficha);
     fichaNombre = ficha.name;
     fichaTipo = ficha.type;
   }
 
-  const { error } = await sb
-    .from(cfg.tables.lubricantes)
-    .insert({
-      empresa_id: state.empresaId,
-      nombre,
-      tipo,
-      marca: marca || null,
-      especificacion: especificacion || null,
-      nota: nota || null,
-      ficha_tecnica_nombre: fichaNombre,
-      ficha_tecnica_tipo: fichaTipo,
-      ficha_tecnica_data_url: fichaDataUrl
-    });
+  const payload = {
+    nombre,
+    tipo,
+    marca: marca || null,
+    especificacion: especificacion || null,
+    nota: nota || null,
+    ficha_tecnica_nombre: fichaNombre,
+    ficha_tecnica_tipo: fichaTipo,
+    ficha_tecnica_data_url: fichaDataUrl
+  };
+
+  const { error } = editando
+    ? await sb.from(cfg.tables.lubricantes).update(payload).eq("id", editando.id)
+    : await sb.from(cfg.tables.lubricantes).insert({ ...payload, empresa_id: state.empresaId });
 
   if (error) {
     mostrarAvisoFlotante(`No se pudo guardar el lubricante: ${error.message}. Corre el Paso 22/23 si aún no los has corrido.`, "error");
@@ -791,9 +811,32 @@ async function guardarLubricante() {
   ["lub-nombre", "lub-marca", "lub-especificacion", "lub-nota"].forEach(id => { if ($(id)) $(id).value = ""; });
   if ($("lub-ficha")) $("lub-ficha").value = "";
   if ($("lub-ficha-preview")) $("lub-ficha-preview").innerHTML = "";
+  state.editandoLubricanteId = "";
   await loadLubricantes();
   renderModules();
-  mostrarAvisoFlotante("Lubricante dado de alta.", "ok");
+  mostrarAvisoFlotante(editando ? "Cambios guardados." : "Lubricante dado de alta.", "ok");
+}
+
+function editarLubricante(id) {
+  if (!isSupervisorMode()) return;
+  state.editandoLubricanteId = id;
+  state.lubricanteFormAbierto = true;
+  cerrarModal();
+  setView("lubricantes");
+  renderModules();
+  document.getElementById("lub-nombre")?.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+function cancelarEdicionLubricante() {
+  state.editandoLubricanteId = "";
+  state.lubricanteFormAbierto = false;
+  renderModules();
+}
+
+function toggleLubricanteForm() {
+  state.lubricanteFormAbierto = !state.lubricanteFormAbierto;
+  if (!state.lubricanteFormAbierto) state.editandoLubricanteId = "";
+  renderModules();
 }
 
 function previewFichaLubricante(input) {
@@ -824,12 +867,32 @@ function lubricanteVisual(tipo) {
   return { icon: "⚙️", clase: "lube-otro" };
 }
 
+function usoLubricante(lubricante) {
+  const nombre = String(lubricante?.nombre || "").trim().toLowerCase();
+  if (!nombre) return [];
+  return state.elementosCartas.filter(el => {
+    const valor = String(el.lubricante || "").trim().toLowerCase();
+    return valor && (valor === nombre || valor.includes(nombre) || nombre.includes(valor));
+  });
+}
+
 function renderPanelLubricante() {
   const l = state.lubricantes.find(item => String(item.id) === String(state.selectedLubricanteId));
   if (!l) return `<div class="empty-state">Selecciona un lubricante.</div>`;
   const visual = lubricanteVisual(l.tipo);
   const tieneFicha = Boolean(l.ficha_tecnica_data_url);
   const fichaEsImagen = String(l.ficha_tecnica_tipo || "").startsWith("image/");
+  const usos = usoLubricante(l);
+  const equiposAsociados = new Set(usos.map(u => u.equipo_id).filter(Boolean));
+  const filasUso = usos.slice(0, 40).map(u => {
+    const eq = state.equipos.find(e => e.id === u.equipo_id);
+    return `<tr>
+      <td>${escapeHtml(eq?.nombre_equipo || eq?.id_tag || "Equipo sin identificar")}</td>
+      <td>${escapeHtml(u.nombre || u.elemento || "-")}</td>
+      <td>${escapeHtml(eq?.area || "-")}</td>
+      <td>${escapeHtml(u.frecuencia || "-")}</td>
+    </tr>`;
+  }).join("");
 
   return `
     <div class="lube-detail-hero">
@@ -847,6 +910,8 @@ function renderPanelLubricante() {
       <div class="lube-stat"><span>🏷️ Marca</span><strong>${escapeHtml(l.marca || "Sin marca")}</strong></div>
       <div class="lube-stat"><span>🧪 Tipo</span><strong>${escapeHtml(l.tipo || "Grasa")}</strong></div>
       <div class="lube-stat"><span>📐 Especificación</span><strong>${escapeHtml(l.especificacion || "Sin especificar")}</strong></div>
+      <div class="lube-stat"><span>⚙️ Equipos asociados</span><strong>${equiposAsociados.size}</strong></div>
+      <div class="lube-stat"><span>📍 Puntos de lubricación</span><strong>${usos.length}</strong></div>
     </div>
     ${l.nota ? `<div class="detail-section-title">🗒 Nota</div><div class="detail-text">${escapeHtml(l.nota)}</div>` : ""}
     ${tieneFicha ? `
@@ -855,8 +920,19 @@ function renderPanelLubricante() {
         ? `<div class="detail-photos"><img src="${escapeHtml(l.ficha_tecnica_data_url)}" alt="${escapeHtml(l.ficha_tecnica_nombre || "Ficha técnica")}" onclick="window.open(this.src, '_blank')"></div>`
         : `<a class="lube-file-chip" href="${escapeHtml(l.ficha_tecnica_data_url)}" target="_blank" rel="noopener"><span>📄</span>${escapeHtml(l.ficha_tecnica_nombre || "Ver ficha técnica (PDF)")}</a>`}
     ` : ""}
+    <div class="detail-section-title">🧰 Dónde se usa</div>
+    ${usos.length ? `
+      <div class="lube-uso-table-wrap">
+        <table class="lube-uso-table">
+          <thead><tr><th>Equipo</th><th>Punto</th><th>Área</th><th>Frecuencia</th></tr></thead>
+          <tbody>${filasUso}</tbody>
+        </table>
+      </div>
+      ${usos.length > 40 ? `<small class="muted">Mostrando 40 de ${usos.length} puntos.</small>` : ""}
+    ` : `<div class="empty-state small">Este lubricante todavía no aparece en ningún punto de las cartas guardadas.</div>`}
     <div class="modal-actions">
       <button class="ghost-action" onclick="cerrarModal()">Cerrar</button>
+      ${isSupervisorMode() ? `<button class="ghost-action" onclick="editarLubricante('${escapeHtml(l.id)}')">✎ Editar</button>` : ""}
       ${isSupervisorMode() ? `<button class="reject-action" onclick="eliminarLubricante('${escapeHtml(l.id)}')">Eliminar</button>` : ""}
     </div>`;
 }
@@ -2830,6 +2906,7 @@ function renderModules() {
                   <option value="cerrada_aprobada" ${state.tareasFiltro.estado === "cerrada_aprobada" ? "selected" : ""}>Aprobada</option>
                   <option value="rechazada" ${state.tareasFiltro.estado === "rechazada" ? "selected" : ""}>Rechazada</option>
                 </select>
+                ${isSupervisorMode() ? `<select onchange="actualizarFiltroTareas('trabajador', this.value)">${opcionesTrabajador(visibleTareas(), "asignado_nombre", state.tareasFiltro.trabajador)}</select>` : ""}
                 <select onchange="actualizarFiltroTareas('orden', this.value)">${opcionesOrden(state.tareasFiltro.orden)}</select>
               </div>
               <span class="muted">${tareasVisibles.length} de ${totalTareasVisibles} registros</span>
@@ -2859,44 +2936,41 @@ function renderModules() {
           </article>
         `;}).join("") : `<div class="empty-state">${totalExtrasVisibles ? "Sin resultados con estos filtros." : isSupervisorMode() ? "Todavía no hay actividades extra registradas para esta empresa." : "Todavía no has registrado actividades extra con este usuario de prueba."}</div>`;
         view.querySelector(".module-panel").innerHTML = `
-          <div class="module-wide split-workspace">
-            <section>
-              <p class="eyebrow">Actividades extra</p>
-              <h2>${isSupervisorMode() ? "Reportes desde campo" : "Reportar actividad extra"}</h2>
-              <p class="muted">${isSupervisorMode() ? "Aquí supervisor revisa los trabajos no programados subidos por campo. Toca uno para aprobarlo o rechazarlo." : `Panel de prueba para ${escapeHtml(user?.nombre || "técnico")}.`}</p>
-              ${isSupervisorMode() ? "" : `
-                <div class="form-preview">
-                  <label>Qué actividad realizaste<textarea id="extra-descripcion" placeholder="Ej: Se corrigió fuga en chumacera, se ajustó guarda, se limpió área..."></textarea></label>
-                  <label>Equipo o área<input id="extra-equipo" placeholder="Ej: BTR-5133 o Secador enfriador"></label>
-                  <div class="two-cols">
-                    <label>Hora inicio<input id="extra-hora-inicio" type="time"></label>
-                    <label>Hora fin<input id="extra-hora-fin" type="time"></label>
-                  </div>
-                  <label>Comentario<textarea id="extra-comentario" placeholder="Observaciones, material usado, condición encontrada..."></textarea></label>
-                  <label>Evidencia o referencia<textarea id="extra-evidencia" placeholder="Folio, nota de evidencia, liga o referencia temporal..."></textarea></label>
-                  <label>Adjuntar foto<input id="extra-foto" type="file" accept="image/*" onchange="previewExtraFoto(this)"></label>
-                  <div id="extra-foto-preview"></div>
-                  <div class="form-action"><button onclick="guardarActividadExtra()">Enviar</button></div>
+          <div class="module-wide">
+            <p class="eyebrow">Actividades extra</p>
+            <h2>${isSupervisorMode() ? "Reportes desde campo" : "Reportar actividad extra"}</h2>
+            <p class="muted">${isSupervisorMode() ? "Aquí supervisor revisa los trabajos no programados subidos por campo. Toca uno para aprobarlo o rechazarlo." : `Panel de prueba para ${escapeHtml(user?.nombre || "técnico")}.`}</p>
+            ${isSupervisorMode() ? "" : `
+              <div class="form-preview">
+                <label>Qué actividad realizaste<textarea id="extra-descripcion" placeholder="Ej: Se corrigió fuga en chumacera, se ajustó guarda, se limpió área..."></textarea></label>
+                <label>Equipo o área<input id="extra-equipo" placeholder="Ej: BTR-5133 o Secador enfriador"></label>
+                <div class="two-cols">
+                  <label>Hora inicio<input id="extra-hora-inicio" type="time"></label>
+                  <label>Hora fin<input id="extra-hora-fin" type="time"></label>
                 </div>
-              `}
-            </section>
-            <section>
-              <div class="panel-head compact-head">
-                <h3>${isSupervisorMode() ? "Extras recientes" : "Mis extras recientes"}</h3>
-                <span class="muted">${extrasVisibles.length} de ${totalExtrasVisibles} registros</span>
+                <label>Comentario<textarea id="extra-comentario" placeholder="Observaciones, material usado, condición encontrada..."></textarea></label>
+                <label>Evidencia o referencia<textarea id="extra-evidencia" placeholder="Folio, nota de evidencia, liga o referencia temporal..."></textarea></label>
+                <label>Adjuntar foto<input id="extra-foto" type="file" accept="image/*" onchange="previewExtraFoto(this)"></label>
+                <div id="extra-foto-preview"></div>
+                <div class="form-action"><button onclick="guardarActividadExtra()">Enviar</button></div>
               </div>
-              <div class="list-toolbar">
-                <input value="${escapeHtml(state.extrasFiltro.q)}" oninput="actualizarFiltroExtras('q', this.value)" placeholder="Buscar actividad, equipo o comentario...">
-                <select onchange="actualizarFiltroExtras('estado', this.value)">
-                  <option value="" ${!state.extrasFiltro.estado ? "selected" : ""}>Todos los estados</option>
-                  <option value="pendiente_revision" ${state.extrasFiltro.estado === "pendiente_revision" ? "selected" : ""}>En revisión</option>
-                  <option value="extra_aprobada" ${state.extrasFiltro.estado === "extra_aprobada" ? "selected" : ""}>Aprobada</option>
-                  <option value="extra_rechazada" ${state.extrasFiltro.estado === "extra_rechazada" ? "selected" : ""}>Rechazada</option>
-                </select>
-                <select onchange="actualizarFiltroExtras('orden', this.value)">${opcionesOrden(state.extrasFiltro.orden)}</select>
-              </div>
-              <div class="activity-list">${extrasHtml}</div>
-            </section>
+            `}
+            <div class="panel-head compact-head">
+              <h3>${isSupervisorMode() ? "Extras recientes" : "Mis extras recientes"}</h3>
+              <span class="muted">${extrasVisibles.length} de ${totalExtrasVisibles} registros</span>
+            </div>
+            <div class="list-toolbar">
+              <input value="${escapeHtml(state.extrasFiltro.q)}" oninput="actualizarFiltroExtras('q', this.value)" placeholder="Buscar actividad, equipo o comentario...">
+              <select onchange="actualizarFiltroExtras('estado', this.value)">
+                <option value="" ${!state.extrasFiltro.estado ? "selected" : ""}>Todos los estados</option>
+                <option value="pendiente_revision" ${state.extrasFiltro.estado === "pendiente_revision" ? "selected" : ""}>En revisión</option>
+                <option value="extra_aprobada" ${state.extrasFiltro.estado === "extra_aprobada" ? "selected" : ""}>Aprobada</option>
+                <option value="extra_rechazada" ${state.extrasFiltro.estado === "extra_rechazada" ? "selected" : ""}>Rechazada</option>
+              </select>
+              ${isSupervisorMode() ? `<select onchange="actualizarFiltroExtras('trabajador', this.value)">${opcionesTrabajador(visibleActividadesExtra(), displayExtraUser, state.extrasFiltro.trabajador)}</select>` : ""}
+              <select onchange="actualizarFiltroExtras('orden', this.value)">${opcionesOrden(state.extrasFiltro.orden)}</select>
+            </div>
+            <div class="activity-list">${extrasHtml}</div>
           </div>`;
         return;
       }
@@ -2913,46 +2987,24 @@ function renderModules() {
         }
 
         const resumen = horasResumen();
-        const selectedHoras = state.selectedHorasTecnico || resumen.rows[0]?.tecnico || "";
-        const detalleHoras = selectedHoras ? horasDetalleTecnico(selectedHoras) : [];
-        const rowsHtml = resumen.rows.length ? resumen.rows.map(row => `
-          <article class="activity-row clickable ${row.tecnico === selectedHoras ? "selected" : ""}" onclick="seleccionarHorasTecnico('${escapeHtml(row.tecnico)}')">
-            <div>
-              <strong>${escapeHtml(row.tecnico)}</strong>
-              <span>${escapeHtml(row.extras)} actividades extra - ${escapeHtml(row.horasExtra)} h reportadas</span>
-              <small>${escapeHtml(row.aprobadas)} aprobadas - ${escapeHtml(row.pendientes)} pendientes - ${escapeHtml(row.rechazadas)} rechazadas</small>
-            </div>
-            <span class="pill">${escapeHtml(row.horasExtra)} h</span>
-          </article>
-        `).join("") : `<div class="empty-state">Todavía no hay horas reportadas en actividades extra.</div>`;
+        const selectedHoras = state.selectedHorasTecnico || "";
+        const listaBase = selectedHoras ? horasDetalleTecnico(selectedHoras) : state.actividades;
+        const lista = ordenarPorFecha(listaBase, "recientes", ["fecha", "created_at"]);
 
-        const latestHtml = state.actividades.length ? state.actividades.slice(0, 8).map(act => `
+        const itemsHtml = lista.length ? lista.map(act => {
+          const foto = displayExtraPhotoData(act);
+          return `
           <article class="activity-row clickable ${act.id === state.selectedExtraId ? "selected" : ""}" onclick="seleccionarHorasExtra('${escapeHtml(act.id)}')">
             <div>
               <strong>${escapeHtml(displayExtraUser(act) || "Sin técnico")}</strong>
               <span>${escapeHtml(act.descripcion || "Sin descripción")} - ${escapeHtml(act.equipo_texto || "Sin equipo")}</span>
               <small>${escapeHtml(act.fecha || "Sin fecha")} ${escapeHtml(act.hora || "")} ${act.horas_hombre ? `- ${escapeHtml(act.horas_hombre)} h` : ""}</small>
+              ${act.comentario ? `<small>${escapeHtml(act.comentario)}</small>` : ""}
+              ${foto ? `<small>Foto: ${escapeHtml(displayExtraPhotoName(act))}</small>` : ""}
             </div>
             <span class="pill">${escapeHtml(act.status || act.revision_status || "extra")}</span>
           </article>
-        `).join("") : `<div class="empty-state">Sin movimientos recientes.</div>`;
-
-        const detailHtml = detalleHoras.length ? detalleHoras.map(act => {
-          const foto = displayExtraPhotoData(act);
-          return `
-            <article class="activity-row">
-              <div>
-                <strong>${escapeHtml(act.descripcion || "Sin descripción")}</strong>
-                <span>${escapeHtml(act.equipo_texto || "Sin equipo")} - ${escapeHtml(act.fecha || "Sin fecha")} ${escapeHtml(act.hora || "")}</span>
-                <small>${escapeHtml(act.hora_inicio || "Sin inicio")} a ${escapeHtml(act.hora_fin || "Sin fin")} ${act.horas_hombre ? `- ${escapeHtml(act.horas_hombre)} h` : ""}</small>
-                ${act.comentario ? `<small>Comentario: ${escapeHtml(act.comentario)}</small>` : ""}
-                ${act.evidencia_texto ? `<small>Evidencia: ${escapeHtml(act.evidencia_texto)}</small>` : ""}
-                ${foto ? `<small>Foto: ${escapeHtml(displayExtraPhotoName(act))}</small>` : ""}
-              </div>
-              <span class="pill">${escapeHtml(act.status || act.revision_status || "extra")}</span>
-            </article>
-          `;
-        }).join("") : `<div class="empty-state">Selecciona un técnico para ver sus movimientos.</div>`;
+        `;}).join("") : `<div class="empty-state">${selectedHoras ? "Este trabajador todavía no tiene movimientos registrados." : "Todavía no hay horas reportadas en actividades extra."}</div>`;
 
         view.querySelector(".module-panel").innerHTML = `
           <div class="module-wide">
@@ -2965,29 +3017,17 @@ function renderModules() {
               <article><span>Pendientes</span><strong>${escapeHtml(resumen.extrasPendientes)}</strong></article>
               <article><span>Tareas cerradas</span><strong>${escapeHtml(resumen.tareasCerradas)}</strong></article>
             </div>
-            <div class="split-workspace">
-              <section>
-                <div class="panel-head compact-head">
-                  <h3>Por técnico</h3>
-                  <span class="muted">${escapeHtml(resumen.rows.length)} técnicos</span>
-                </div>
-                <div class="activity-list">${rowsHtml}</div>
-              </section>
-              <section>
-                <div class="panel-head compact-head">
-                  <h3>Movimientos recientes</h3>
-                  <span class="muted">${escapeHtml(state.actividades.length)} extras</span>
-                </div>
-                <div class="activity-list">${latestHtml}</div>
-              </section>
+            <div class="panel-head compact-head">
+              <h3>${selectedHoras ? `Movimientos de ${escapeHtml(selectedHoras)}` : "Todos los movimientos"}</h3>
+              <span class="muted">${lista.length} registros</span>
             </div>
-            <section class="hours-detail">
-              <div class="panel-head compact-head">
-                <h3>Detalle ${selectedHoras ? `- ${escapeHtml(selectedHoras)}` : ""}</h3>
-                <span class="muted">${escapeHtml(detalleHoras.length)} movimientos</span>
-              </div>
-              <div class="activity-list">${detailHtml}</div>
-            </section>
+            <div class="list-toolbar">
+              <select onchange="seleccionarHorasTecnico(this.value)">
+                <option value="" ${!selectedHoras ? "selected" : ""}>Todos los trabajadores</option>
+                ${resumen.rows.map(row => `<option value="${escapeHtml(row.tecnico)}" ${selectedHoras === row.tecnico ? "selected" : ""}>${escapeHtml(row.tecnico)} · ${escapeHtml(row.horasExtra)} h</option>`).join("")}
+              </select>
+            </div>
+            <div class="activity-list">${itemsHtml}</div>
           </div>`;
         return;
       }
@@ -3008,36 +3048,47 @@ function renderModules() {
           </article>`;
         }).join("") : `<div class="empty-state">${state.lubricantes.length ? "Sin resultados con esta búsqueda." : "Todavía no hay lubricantes dados de alta para esta empresa."}</div>`;
 
+        const editando = state.editandoLubricanteId ? state.lubricantes.find(item => String(item.id) === String(state.editandoLubricanteId)) : null;
+        const formAbierto = isSupervisorMode() && (state.lubricanteFormAbierto || Boolean(editando));
+
         view.querySelector(".module-panel").innerHTML = `
-          <div class="module-wide ${isSupervisorMode() ? "split-workspace" : ""}">
-            ${isSupervisorMode() ? `
-              <section>
+          <div class="module-wide">
+            <div class="panel-head">
+              <div>
                 <p class="eyebrow">Lubricantes</p>
-                <h2>Dar de alta lubricante</h2>
+                <h2>Catálogo de lubricantes</h2>
+                <span class="muted">${lubricantes.length} de ${state.lubricantes.length} registros</span>
+              </div>
+              ${isSupervisorMode() ? `<button onclick="toggleLubricanteForm()">${formAbierto ? "✕ Cerrar" : "+ Nuevo lubricante"}</button>` : ""}
+            </div>
+            ${formAbierto ? `
+              <section class="lube-form-panel">
+                <h3>${editando ? `Editar: ${escapeHtml(editando.nombre)}` : "Dar de alta lubricante"}</h3>
                 <div class="form-preview">
-                  <label>Nombre<input id="lub-nombre" placeholder="Ej: Synlox Xtreme Syn Grado 2"></label>
+                  <label>Nombre<input id="lub-nombre" placeholder="Ej: Synlox Xtreme Syn Grado 2" value="${escapeHtml(editando?.nombre || "")}"></label>
                   <div class="two-cols">
-                    <label>Tipo<select id="lub-tipo"><option>Grasa</option><option>Aceite</option><option>Otro</option></select></label>
-                    <label>Marca<input id="lub-marca" placeholder="Ej: Molub"></label>
+                    <label>Tipo<select id="lub-tipo">
+                      <option ${(!editando || editando.tipo === "Grasa") ? "selected" : ""}>Grasa</option>
+                      <option ${editando?.tipo === "Aceite" ? "selected" : ""}>Aceite</option>
+                      <option ${editando?.tipo === "Otro" ? "selected" : ""}>Otro</option>
+                    </select></label>
+                    <label>Marca<input id="lub-marca" placeholder="Ej: Molub" value="${escapeHtml(editando?.marca || "")}"></label>
                   </div>
-                  <label>Especificación<input id="lub-especificacion" placeholder="Ej: ISO 220, NLGI 2..."></label>
-                  <label>Nota<textarea id="lub-nota" placeholder="Uso recomendado, equivalencias, observaciones..."></textarea></label>
+                  <label>Especificación<input id="lub-especificacion" placeholder="Ej: ISO 220, NLGI 2..." value="${escapeHtml(editando?.especificacion || "")}"></label>
+                  <label>Nota<textarea id="lub-nota" placeholder="Uso recomendado, equivalencias, observaciones...">${escapeHtml(editando?.nota || "")}</textarea></label>
                   <label>Ficha técnica o presentación (PDF o imagen)<input id="lub-ficha" type="file" accept="application/pdf,image/*" onchange="previewFichaLubricante(this)"></label>
-                  <div id="lub-ficha-preview"></div>
-                  <div class="form-action"><button onclick="guardarLubricante()">Dar de alta</button></div>
+                  <div id="lub-ficha-preview">${editando?.ficha_tecnica_nombre ? `<div class="closure-photo"><small>📎 Ya tiene: ${escapeHtml(editando.ficha_tecnica_nombre)} (sube otro archivo para reemplazarla)</small></div>` : ""}</div>
+                  <div class="form-action">
+                    ${editando ? `<button class="ghost-action" onclick="cancelarEdicionLubricante()">Cancelar</button>` : ""}
+                    <button onclick="guardarLubricante()">${editando ? "Guardar cambios" : "Dar de alta"}</button>
+                  </div>
                 </div>
               </section>
             ` : ""}
-            <section>
-              <div class="panel-head compact-head">
-                <h3>Catálogo de lubricantes</h3>
-                <span class="muted">${lubricantes.length} de ${state.lubricantes.length} registros</span>
-              </div>
-              <div class="list-toolbar">
-                <input value="${escapeHtml(state.lubricanteSearch)}" oninput="buscarLubricantes(this.value)" placeholder="Buscar por nombre, tipo, marca o especificación...">
-              </div>
-              <div class="lubricantes-grid">${lubricantesHtml}</div>
-            </section>
+            <div class="list-toolbar">
+              <input value="${escapeHtml(state.lubricanteSearch)}" oninput="buscarLubricantes(this.value)" placeholder="Buscar por nombre, tipo, marca o especificación...">
+            </div>
+            <div class="lubricantes-grid">${lubricantesHtml}</div>
           </div>`;
         return;
       }
