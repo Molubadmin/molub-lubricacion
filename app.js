@@ -279,6 +279,8 @@ function syncAuthLockedControls() {
   const locked = Boolean(state.authUser);
   if ($("role-select")) $("role-select").disabled = locked;
   if ($("empresa-select")) $("empresa-select").disabled = locked;
+  document.querySelector(".role-picker")?.classList.toggle("hidden", locked);
+  document.querySelector(".company-picker")?.classList.toggle("hidden", locked);
 }
 
 function renderAuthPanel() {

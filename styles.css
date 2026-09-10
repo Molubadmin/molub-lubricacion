@@ -2,11 +2,11 @@
 .acceso-gate{position:fixed;inset:0;z-index:980;background:url(./assets/login-bg.png?v=5) right center/cover no-repeat,#f4f6fb;overflow-y:auto;display:flex}
 .acceso-gate.hidden{display:none}
 body.gate-activo .sidebar,body.gate-activo .mobile-menu-toggle,body.gate-activo .app{display:none!important}
-.acceso-gate-panel{width:100%;max-width:520px;min-height:100%;background:#fff;display:flex;flex-direction:column;justify-content:center;gap:30px;padding:48px 40px;box-shadow:10px 0 50px rgba(7,17,46,.08)}
-.acceso-gate-hero{display:flex;flex-direction:column;align-items:flex-start;gap:14px}
-.acceso-gate-hero-logo{height:44px;object-fit:contain}
-.acceso-gate-hero-rule{width:40px;height:3px;background:var(--blue);border-radius:2px}
-.acceso-gate-hero-tagline{margin:0;color:var(--ink);font-weight:800;text-transform:uppercase;letter-spacing:.8px;font-size:13px;line-height:1.6}
+.acceso-gate-panel{width:100%;max-width:540px;min-height:100%;background:#fff;display:flex;flex-direction:column;justify-content:center;gap:34px;padding:48px 56px;box-shadow:10px 0 50px rgba(7,17,46,.08)}
+.acceso-gate-hero{display:flex;flex-direction:column;align-items:flex-start;gap:18px}
+.acceso-gate-hero-logo{height:76px;object-fit:contain}
+.acceso-gate-hero-rule{width:48px;height:4px;background:var(--blue);border-radius:2px}
+.acceso-gate-hero-tagline{margin:0;color:var(--ink);font-weight:800;text-transform:uppercase;letter-spacing:.8px;font-size:14px;line-height:1.65}
 .acceso-gate-box{width:100%;text-align:left}
 .acceso-gate-box h1{font-size:20px;margin:2px 0 20px;color:var(--ink)}
 .acceso-gate-section{text-align:left;margin-bottom:8px}
