@@ -1607,6 +1607,26 @@ function seleccionarTarea(id) {
   abrirModal(renderPanelCierre());
 }
 
+async function eliminarTarea(id) {
+  if (!isSupervisorMode()) return;
+  if (!window.confirm("¿Eliminar esta asignación? No se puede deshacer.")) return;
+
+  const { data, error } = await sb.from(cfg.tables.tareas).delete().eq("id", id).select("id");
+  if (!error && (!data || data.length === 0)) {
+    mostrarAvisoFlotante("Falta el permiso de borrado en Supabase (Paso 30).", "error");
+    return;
+  }
+  if (error) {
+    mostrarAvisoFlotante(`No se pudo eliminar: ${error.message}`, "error");
+    return;
+  }
+
+  await loadTareas();
+  renderModules();
+  cerrarModal();
+  mostrarAvisoFlotante("Asignación eliminada.", "ok");
+}
+
 function renderPanelCierre() {
   const t = selectedTarea();
   if (!t) {
@@ -1651,6 +1671,7 @@ function renderPanelCierre() {
       <div class="form-preview"><textarea id="revision-comentario" placeholder="Opcional al autorizar. Obligatorio si rechazas.">${escapeHtml(t.revision_comentario || "")}</textarea></div>
       <div class="modal-actions">
         <button class="ghost-action" onclick="cerrarModal()">Cerrar</button>
+        <button class="reject-action" onclick="eliminarTarea('${escapeHtml(t.id)}')" title="Eliminar por completo">🗑 Eliminar</button>
         <button class="reject-action" onclick="revisarCierreTarea('rechazado')">✕ Rechazar</button>
         <button class="approve-action" onclick="revisarCierreTarea('aprobado')">✓ Autorizar</button>
       </div>
@@ -2681,6 +2702,26 @@ async function revisarActividadExtra(decision) {
   mostrarAvisoFlotante(aprobada ? "Actividad aprobada." : "Actividad rechazada.", aprobada ? "ok" : "error");
 }
 
+async function eliminarActividadExtra(id) {
+  if (!isSupervisorMode()) return;
+  if (!window.confirm("¿Eliminar esta actividad extra? No se puede deshacer.")) return;
+
+  const { data, error } = await sb.from(cfg.tables.actividades).delete().eq("id", id).select("id");
+  if (!error && (!data || data.length === 0)) {
+    mostrarAvisoFlotante("Falta el permiso de borrado en Supabase (Paso 30).", "error");
+    return;
+  }
+  if (error) {
+    mostrarAvisoFlotante(`No se pudo eliminar: ${error.message}`, "error");
+    return;
+  }
+
+  await loadActividades();
+  renderModules();
+  cerrarModal();
+  mostrarAvisoFlotante("Actividad extra eliminada.", "ok");
+}
+
 function renderPanelExtra() {
   const e = selectedExtra();
   if (!e) {
@@ -2750,6 +2791,7 @@ function renderPanelExtra() {
     <div class="form-preview"><textarea id="extra-revision-comentario" placeholder="Opcional al autorizar. Obligatorio si rechazas.">${escapeHtml(e.revision_comentario || "")}</textarea></div>
     <div class="modal-actions">
       <button class="ghost-action" onclick="cerrarModal()">Cerrar</button>
+      <button class="reject-action" onclick="eliminarActividadExtra('${escapeHtml(e.id)}')" title="Eliminar por completo">🗑 Eliminar</button>
       <button class="reject-action" onclick="revisarActividadExtra('rechazado')">✕ Rechazar</button>
       <button class="approve-action" onclick="revisarActividadExtra('aprobado')">✓ Autorizar</button>
     </div>`;
