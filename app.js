@@ -1004,9 +1004,13 @@ async function autoAsociarEquiposLubricante(lubricanteId, opciones = {}) {
 
   if (!nuevas.length) {
     if (!opciones.silencioso) {
-      state.lubricanteAliasPickerAbierto = true;
-      renderModules();
-      mostrarAvisoFlotante("No hay coincidencias con ese nombre. Elige abajo cómo está escrito en tus cartas.", "info");
+      if (coincidencias.length) {
+        mostrarAvisoFlotante("Ya están asociados todos los equipos que encontramos con ese nombre.", "ok");
+      } else {
+        state.lubricanteAliasPickerAbierto = true;
+        renderModules();
+        mostrarAvisoFlotante("No hay coincidencias con ese nombre. Elige abajo cómo está escrito en tus cartas.", "error");
+      }
     }
     return;
   }
