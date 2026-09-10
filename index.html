@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sistema de Gestión de Lubricación - MOLUB</title>
+  <link rel="stylesheet" href="./styles.css?v=paso34-qr-fix">
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand">
+      <img src="./assets/logo-molub.png" alt="MOLUB">
+    </div>
+    <nav>
+      <button class="nav active" data-view="dashboard">Dashboard</button>
+      <button class="nav" data-view="equipos">Ingresar a planta</button>
+      <button class="nav" data-view="actividades">Actividades programadas</button>
+      <button class="nav" data-view="tareas">Asignaciones</button>
+      <button class="nav" data-view="extras">Actividades extra</button>
+      <button class="nav" data-view="horas">Horas hombre</button>
+      <button class="nav" data-view="cartas">Cartas realizadas</button>
+      <button class="nav" data-view="modulos">Módulos por empresa</button>
+    </nav>
+    <div class="session">
+      <span>Modo laboratorio</span>
+      <strong id="session-company">Sin empresa</strong>
+      <div id="sidebar-auth-session" class="auth-user sidebar-auth hidden">
+        <strong id="sidebar-auth-user-label">Sin sesión</strong>
+        <button id="sidebar-auth-logout" class="secondary-auth" type="button" title="Cerrar sesión">&#9099; Salir</button>
+      </div>
+    </div>
+  </aside>
+
+  <main class="app">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Sistema de Gestión de Lubricación</p>
+        <h1>MOLUB Platform</h1>
+      </div>
+      <img class="top-gear" src="./assets/gear-blue.png" alt="">
+      <div class="auth-panel">
+        <span>Acceso real</span>
+        <div id="auth-login-form" class="auth-login-row">
+          <input id="auth-email" type="email" autocomplete="username" placeholder="Correo">
+          <input id="auth-password" type="password" autocomplete="current-password" placeholder="Contraseña">
+          <button id="auth-login" type="button">Entrar</button>
+        </div>
+        <div id="auth-session" class="auth-user hidden">
+          <strong id="auth-user-label">Sin sesión</strong>
+          <button id="auth-logout" class="secondary-auth" type="button">Salir</button>
+        </div>
+        <small id="auth-message" class="auth-message">Modo laboratorio activo.</small>
+      </div>
+      <label class="role-picker">
+        <span>Rol de prueba</span>
+        <select id="role-select">
+          <option value="SUPERVISOR">Supervisor</option>
+          <option value="TECNICO_MEC">Técnico mecánico</option>
+          <option value="TECNICO_ELC">Técnico eléctrico</option>
+          <option value="TECNICO_CONTR">Contratista</option>
+        </select>
+      </label>
+      <label class="user-picker">
+        <span>Usuario de prueba</span>
+        <select id="user-select"></select>
+      </label>
+      <label class="company-picker">
+        <span>Empresa activa</span>
+        <select id="empresa-select"></select>
+      </label>
+    </header>
+
+    <section id="status" class="status">Cargando configuración...</section>
+
+    <section id="dashboard" class="view active">
+      <div class="hero">
+        <div id="empresa-logo-card" class="empresa-logo-card" aria-hidden="true">MO</div>
+        <div>
+          <p class="eyebrow">Empresa activa</p>
+          <h2 id="empresa-nombre">Selecciona una empresa</h2>
+          <p id="empresa-sub">Los datos se filtran por empresa_id.</p>
+        </div>
+        <div class="hero-metric">
+          <strong id="metric-total">0</strong>
+          <span>equipos</span>
+        </div>
+      </div>
+
+      <div class="cards">
+        <article>
+          <span>Total equipos</span>
+          <strong id="card-total">0</strong>
+        </article>
+        <article>
+          <span>Áreas</span>
+          <strong id="card-areas">0</strong>
+        </article>
+        <article>
+          <span>Criticidad A</span>
+          <strong id="card-crit-a">0</strong>
+        </article>
+        <article>
+          <span>Módulos activos</span>
+          <strong id="card-modulos">0</strong>
+        </article>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h3>Módulos de esta empresa</h3>
+          <span id="modules-count">0 activos</span>
+        </div>
+        <div id="modules-strip" class="modules-strip"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h3>Avance por área</h3>
+          <span id="area-count">0 áreas</span>
+        </div>
+        <div id="areas-list" class="areas-list"></div>
+      </div>
+    </section>
+
+    <section id="equipos" class="view">
+      <div class="panel">
+        <div class="panel-head">
+          <h3>Ingresar a planta</h3>
+          <div class="filter-row">
+            <input id="search" placeholder="Buscar ID TAG, equipo, área o proceso">
+            <select id="equipos-area-filter" onchange="filtrarEquiposPorArea(this.value)"><option value="">Todas las áreas</option></select>
+          </div>
+        </div>
+        <div id="equipos-list" class="equipos-list"></div>
+      </div>
+    </section>
+
+    <section id="levantamiento" class="view module-view" data-module="levantamiento">
+      <div class="panel module-panel"></div>
+    </section>
+
+    <section id="cartas" class="view module-view" data-module="cartas">
+      <div class="panel module-panel"></div>
+    </section>
+
+    <section id="actividades" class="view module-view" data-module="actividades">
+      <div class="panel module-panel"></div>
+    </section>
+
+    <section id="tareas" class="view module-view" data-module="tareas">
+      <div class="panel module-panel"></div>
+    </section>
+
+    <section id="extras" class="view module-view" data-module="extras">
+      <div class="panel module-panel"></div>
+    </section>
+
+    <section id="horas" class="view module-view" data-module="horas">
+      <div class="panel module-panel"></div>
+    </section>
+
+    <section id="modulos" class="view">
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Administración</p>
+            <h2>Módulos por empresa</h2>
+          </div>
+          <span id="module-source-label" class="muted">Supabase / laboratorio</span>
+        </div>
+        <p class="muted">Aquí decides qué apartados tendrá disponible cada empresa. Cuando exista la tabla empresa_modulos, estos cambios se guardarán en Supabase.</p>
+        <div id="module-settings" class="module-settings"></div>
+      </div>
+    </section>
+  </main>
+
+  <div id="modal-overlay" class="modal-overlay hidden" onclick="if(event.target===this) cerrarModal()">
+    <div class="modal-box" id="modal-box"></div>
+  </div>
+
+  <script src="./config.js?v=paso15e-fotos-grandes"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script src="./app.js?v=paso34-qr-fix"></script>
+</body>
+</html>

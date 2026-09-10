@@ -1,0 +1,8 @@
+# Migraciones SQL con datos reales (nombres, equipos, comentarios) - no publicar
+*.sql
+
+# Cache local de migracion legacy (datos reales)
+work-cartas-legacy-cache.json
+
+# Config local del editor
+.claude/
