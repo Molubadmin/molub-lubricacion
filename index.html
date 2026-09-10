@@ -4,9 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Sistema de Gestión de Lubricación - MOLUB</title>
-  <link rel="stylesheet" href="./styles.css?v=paso37-qr-bar-fix">
+  <link rel="stylesheet" href="./styles.css?v=paso41-login-y-lubricantes">
 </head>
 <body>
+  <script>if (/[?&]carta=/.test(location.search)) document.documentElement.classList.add("cargando-carta");</script>
+  <div id="qr-loading" class="qr-loading">
+    <img src="./assets/logo-molub.png" alt="MOLUB">
+    <p>Cargando carta de lubricación...</p>
+  </div>
   <button class="mobile-menu-toggle" id="mobile-menu-toggle" onclick="toggleSidebarMobile()" aria-label="Abrir menu">&#9776;</button>
   <div class="sidebar-backdrop" onclick="toggleSidebarMobile(false)"></div>
   <aside class="sidebar">
@@ -21,6 +26,7 @@
       <button class="nav" data-view="extras">Actividades extra</button>
       <button class="nav" data-view="horas">Horas hombre</button>
       <button class="nav" data-view="cartas">Cartas realizadas</button>
+      <button class="nav" data-view="lubricantes">Lubricantes</button>
       <button class="nav" data-view="modulos">Módulos por empresa</button>
     </nav>
     <div class="session">
@@ -32,6 +38,43 @@
       </div>
     </div>
   </aside>
+
+  <div id="acceso-gate" class="acceso-gate hidden">
+    <div class="acceso-gate-box">
+      <img class="acceso-gate-logo" src="./assets/logo-molub.png" alt="MOLUB">
+      <p class="eyebrow">Sistema de Gestión de Lubricación</p>
+      <h1>Inicia sesión para continuar</h1>
+      <p id="gate-error" class="gate-error hidden"></p>
+
+      <div class="acceso-gate-section">
+        <span class="acceso-gate-label">Acceso real (supervisor/admin)</span>
+        <div class="acceso-gate-row">
+          <input id="gate-email" type="email" autocomplete="username" placeholder="Correo">
+          <input id="gate-password" type="password" autocomplete="current-password" placeholder="Contraseña">
+        </div>
+        <button id="gate-login-btn" type="button" class="acceso-gate-primary">Entrar</button>
+      </div>
+
+      <div class="acceso-gate-divider"><span>o continúa en modo laboratorio</span></div>
+
+      <div class="acceso-gate-section">
+        <label class="acceso-gate-field">
+          <span class="acceso-gate-label">Rol de prueba</span>
+          <select id="gate-role-select">
+            <option value="SUPERVISOR">Supervisor</option>
+            <option value="TECNICO_MEC">Técnico mecánico</option>
+            <option value="TECNICO_ELC">Técnico eléctrico</option>
+            <option value="TECNICO_CONTR">Contratista</option>
+          </select>
+        </label>
+        <label class="acceso-gate-field">
+          <span class="acceso-gate-label">Empresa activa</span>
+          <select id="gate-empresa-select"></select>
+        </label>
+        <button id="gate-continue-btn" type="button" class="acceso-gate-secondary">Continuar en modo laboratorio</button>
+      </div>
+    </div>
+  </div>
 
   <main class="app">
     <header class="topbar">
@@ -161,6 +204,10 @@
       <div class="panel module-panel"></div>
     </section>
 
+    <section id="lubricantes" class="view module-view" data-module="lubricantes">
+      <div class="panel module-panel"></div>
+    </section>
+
     <section id="modulos" class="view">
       <div class="panel">
         <div class="panel-head">
@@ -180,9 +227,9 @@
     <div class="modal-box" id="modal-box"></div>
   </div>
 
-  <script src="./config.js?v=paso15e-fotos-grandes"></script>
+  <script src="./config.js?v=paso41-lubricantes"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
-<script src="./app.js?v=paso36-responsive-movil"></script>
+<script src="./app.js?v=paso41-login-y-lubricantes"></script>
 </body>
 </html>

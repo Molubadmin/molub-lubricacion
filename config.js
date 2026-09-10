@@ -11,6 +11,7 @@ window.MOLUB_CONFIG = {
     tareas: "tareas_asignadas",
     cartas: "cartas_lubricacion",
     elementosCartas: "elementos_lubricacion",
-    empresaModulos: "empresa_modulos_app"
+    empresaModulos: "empresa_modulos_app",
+    lubricantes: "lubricantes"
   }
 };

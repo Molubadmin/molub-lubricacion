@@ -10,6 +10,9 @@ const state = {
   tareas: [],
   cartas: [],
   elementosCartas: [],
+  lubricantes: [],
+  selectedLubricanteId: "",
+  lubricanteSearch: "",
   perfiles: [],
   sessionRole: "SUPERVISOR",
   selectedUserId: "",
@@ -51,6 +54,7 @@ const MODULES = [
   { id: "extras", label: "Actividades extra", desc: "Reporte de trabajos adicionales subidos por técnicos" },
   { id: "horas", label: "Horas hombre", desc: "Resumen operativo por técnico" }
   ,{ id: "cartas", label: "Cartas realizadas", desc: "Cartas de lubricación guardadas, pendientes e impresión" }
+  ,{ id: "lubricantes", label: "Lubricantes", desc: "Catálogo de lubricantes dados de alta para esta empresa" }
 ];
 const MODULE_STORE = "molub_v2_modules_by_company";
 const TAREA_SELECT_BASE = "id,empresa_id,usuario_id,equipo_id,actividad,descripcion,equipo_texto,prioridad,fecha_envio,hora_envio,fecha_limite,comentario,status,tipo,tipo_programacion,programada_id,asignado_nombre,asignado_rol,contratista_nombre,created_at,updated_at";
@@ -232,7 +236,7 @@ function displayExtraPhotoName(act) {
 
 function roleAllowsView(view) {
   if (isSupervisorMode()) return true;
-  return ["equipos", "levantamiento", "tareas", "extras", "cartas"].includes(view);
+  return ["equipos", "levantamiento", "tareas", "extras", "cartas", "lubricantes"].includes(view);
 }
 
 function roleMatchesSession(rol) {
@@ -354,7 +358,7 @@ async function loginAuth() {
   const email = ($("auth-email")?.value || "").trim().toLowerCase();
   const password = $("auth-password")?.value || "";
   if (!email || !password) {
-    setStatus("Escribe correo y contrasena para entrar.", "warn");
+    setStatus("Escribe correo y contraseña para entrar.", "warn");
     return;
   }
 
@@ -377,8 +381,34 @@ async function logoutAuth() {
   state.authPerfil = null;
   state.selectedUserId = "";
   renderAuthPanel();
-  await loadEquipos();
-  setStatus("Sesión cerrada. Modo laboratorio activo.", "ok");
+  mostrarGateAcceso();
+  setStatus("Sesión cerrada.", "ok");
+}
+
+function mostrarGateAcceso() {
+  const gateEmpresa = $("gate-empresa-select");
+  if (gateEmpresa) {
+    gateEmpresa.innerHTML = $("empresa-select")?.innerHTML || "";
+    gateEmpresa.value = state.empresaId;
+  }
+  document.body.classList.add("gate-activo");
+  $("acceso-gate")?.classList.remove("hidden");
+}
+
+function ocultarGateAcceso() {
+  document.body.classList.remove("gate-activo");
+  $("acceso-gate")?.classList.add("hidden");
+}
+
+function mostrarErrorGate(mensaje) {
+  const el = $("gate-error");
+  if (!el) return;
+  el.textContent = mensaje;
+  el.classList.remove("hidden");
+}
+
+function ocultarErrorGate() {
+  $("gate-error")?.classList.add("hidden");
 }
 
 function syncUserPicker() {
@@ -615,6 +645,7 @@ async function loadEquipos() {
   await loadTareas();
   await loadCartas();
   await loadElementosCartas();
+  await loadLubricantes();
   await loadPerfiles();
   if (!state.equipos.some(e => e.id === state.selectedEquipoId)) {
     state.selectedEquipoId = state.equipos[0]?.id || "";
@@ -640,6 +671,118 @@ async function loadCartas() {
     return;
   }
   state.cartas = data || [];
+}
+
+async function loadLubricantes() {
+  state.lubricantes = [];
+  if (!cfg.tables.lubricantes || !state.empresaId) return;
+
+  const { data, error } = await sb
+    .from(cfg.tables.lubricantes)
+    .select("*")
+    .eq("empresa_id", state.empresaId)
+    .order("nombre");
+
+  if (error) {
+    console.warn("No se pudieron cargar lubricantes:", error.message);
+    return;
+  }
+  state.lubricantes = data || [];
+}
+
+function lubricantesFiltrados() {
+  const q = String(state.lubricanteSearch || "").trim().toLowerCase();
+  if (!q) return state.lubricantes;
+  return state.lubricantes.filter(l =>
+    [l.nombre, l.tipo, l.marca, l.especificacion].join(" ").toLowerCase().includes(q)
+  );
+}
+
+function buscarLubricantes(value) {
+  state.lubricanteSearch = value || "";
+  renderModules();
+}
+
+async function guardarLubricante() {
+  if (!isSupervisorMode()) {
+    mostrarAvisoFlotante("Solo supervisor/admin puede dar de alta lubricantes.", "error");
+    return;
+  }
+  const nombre = $("lub-nombre")?.value.trim();
+  const tipo = $("lub-tipo")?.value || "Grasa";
+  const marca = $("lub-marca")?.value.trim();
+  const especificacion = $("lub-especificacion")?.value.trim();
+  const nota = $("lub-nota")?.value.trim();
+
+  if (!nombre) {
+    mostrarAvisoFlotante("Escribe el nombre del lubricante antes de guardar.", "error");
+    return;
+  }
+
+  const { error } = await sb
+    .from(cfg.tables.lubricantes)
+    .insert({
+      empresa_id: state.empresaId,
+      nombre,
+      tipo,
+      marca: marca || null,
+      especificacion: especificacion || null,
+      nota: nota || null
+    });
+
+  if (error) {
+    mostrarAvisoFlotante(`No se pudo guardar el lubricante: ${error.message}. Corre el Paso 22 si aún no lo has corrido.`, "error");
+    return;
+  }
+
+  ["lub-nombre", "lub-marca", "lub-especificacion", "lub-nota"].forEach(id => { if ($(id)) $(id).value = ""; });
+  await loadLubricantes();
+  renderModules();
+  mostrarAvisoFlotante("Lubricante dado de alta.", "ok");
+}
+
+function seleccionarLubricante(id) {
+  state.selectedLubricanteId = id;
+  abrirModal(renderPanelLubricante());
+}
+
+function renderPanelLubricante() {
+  const l = state.lubricantes.find(item => String(item.id) === String(state.selectedLubricanteId));
+  if (!l) return `<div class="empty-state">Selecciona un lubricante.</div>`;
+  return `
+    <div class="panel-head compact-head">
+      <h3>${escapeHtml(l.nombre)}</h3>
+      <span class="status-pill">${escapeHtml(l.tipo || "Grasa")}</span>
+    </div>
+    <div class="detail-grid">
+      ${campoDetalle("Marca", l.marca || "-")}
+      ${campoDetalle("Especificación", l.especificacion || "-")}
+    </div>
+    ${l.nota ? `<div class="detail-section-title">🗒 Nota</div><div class="detail-text">${escapeHtml(l.nota)}</div>` : ""}
+    <div class="modal-actions">
+      <button class="ghost-action" onclick="cerrarModal()">Cerrar</button>
+      ${isSupervisorMode() ? `<button class="reject-action" onclick="eliminarLubricante('${escapeHtml(l.id)}')">Eliminar</button>` : ""}
+    </div>`;
+}
+
+async function eliminarLubricante(id) {
+  if (!isSupervisorMode()) return;
+  if (!window.confirm("¿Eliminar este lubricante del catálogo?")) return;
+
+  const { data, error } = await sb.from(cfg.tables.lubricantes).delete().eq("id", id).select("id");
+  if (!error && (!data || data.length === 0)) {
+    mostrarAvisoFlotante("Falta el permiso de borrado en Supabase (Paso 22).", "error");
+    return;
+  }
+  if (error) {
+    mostrarAvisoFlotante(`No se pudo eliminar: ${error.message}`, "error");
+    return;
+  }
+
+  await loadLubricantes();
+  renderModules();
+  cerrarModal();
+  mostrarAvisoFlotante("Lubricante eliminado.", "ok");
 }
 
 async function loadElementosCartas() {
@@ -2752,6 +2895,50 @@ function renderModules() {
           </div>`;
         return;
       }
+      if (id === "lubricantes") {
+        const lubricantes = lubricantesFiltrados();
+        const lubricantesHtml = lubricantes.length ? lubricantes.map(l => `
+          <article class="activity-row clickable" onclick="seleccionarLubricante('${escapeHtml(l.id)}')">
+            <div>
+              <strong>${escapeHtml(l.nombre)}</strong>
+              <span>${escapeHtml(l.marca || "Sin marca")} ${l.especificacion ? `- ${escapeHtml(l.especificacion)}` : ""}</span>
+              ${l.nota ? `<small>${escapeHtml(l.nota)}</small>` : ""}
+            </div>
+            <span class="pill">${escapeHtml(l.tipo || "Grasa")}</span>
+          </article>
+        `).join("") : `<div class="empty-state">${state.lubricantes.length ? "Sin resultados con esta búsqueda." : "Todavía no hay lubricantes dados de alta para esta empresa."}</div>`;
+
+        view.querySelector(".module-panel").innerHTML = `
+          <div class="module-wide ${isSupervisorMode() ? "split-workspace" : ""}">
+            ${isSupervisorMode() ? `
+              <section>
+                <p class="eyebrow">Lubricantes</p>
+                <h2>Dar de alta lubricante</h2>
+                <div class="form-preview">
+                  <label>Nombre<input id="lub-nombre" placeholder="Ej: Synlox Xtreme Syn Grado 2"></label>
+                  <div class="two-cols">
+                    <label>Tipo<select id="lub-tipo"><option>Grasa</option><option>Aceite</option><option>Otro</option></select></label>
+                    <label>Marca<input id="lub-marca" placeholder="Ej: Molub"></label>
+                  </div>
+                  <label>Especificación<input id="lub-especificacion" placeholder="Ej: ISO 220, NLGI 2..."></label>
+                  <label>Nota<textarea id="lub-nota" placeholder="Uso recomendado, equivalencias, observaciones..."></textarea></label>
+                  <div class="form-action"><button onclick="guardarLubricante()">Dar de alta</button></div>
+                </div>
+              </section>
+            ` : ""}
+            <section>
+              <div class="panel-head compact-head">
+                <h3>Catálogo de lubricantes</h3>
+                <span class="muted">${lubricantes.length} de ${state.lubricantes.length} registros</span>
+              </div>
+              <div class="list-toolbar">
+                <input value="${escapeHtml(state.lubricanteSearch)}" oninput="buscarLubricantes(this.value)" placeholder="Buscar por nombre, tipo, marca o especificación...">
+              </div>
+              <div class="activity-list">${lubricantesHtml}</div>
+            </section>
+          </div>`;
+        return;
+      }
       if (id === "cartas") {
         const cartas = cartasFiltradas();
         const carta = selectedCarta();
@@ -2997,6 +3184,11 @@ function setView(view) {
   document.body.classList.toggle("hide-topbar", view !== "dashboard");
 }
 
+function ocultarPantallaCargaQr() {
+  document.documentElement.classList.remove("cargando-carta");
+  $("qr-loading")?.remove();
+}
+
 async function abrirCartaDesdeLiga(cartaId) {
   setStatus("Cargando carta desde el código QR...");
   const { data: cartaRow, error } = await sb
@@ -3011,6 +3203,7 @@ async function abrirCartaDesdeLiga(cartaId) {
     $("empresa-select").value = state.empresaId;
     syncAuthLockedControls();
     await loadEquipos();
+    ocultarPantallaCargaQr();
     return;
   }
 
@@ -3026,6 +3219,7 @@ async function abrirCartaDesdeLiga(cartaId) {
   setView("cartas");
   render();
   clearStatus();
+  ocultarPantallaCargaQr();
 }
 
 async function init() {
@@ -3040,7 +3234,11 @@ async function init() {
     await loadEmpresas();
     $("empresa-select").value = state.empresaId;
     syncAuthLockedControls();
-    await loadEquipos();
+    if (state.authUser) {
+      await loadEquipos();
+    } else {
+      mostrarGateAcceso();
+    }
   } catch (err) {
     setStatus(err.message || String(err), "error");
   } finally {
@@ -3092,6 +3290,52 @@ $("auth-password")?.addEventListener("keydown", (event) => {
 });
 $("auth-email")?.addEventListener("keydown", (event) => {
   if (event.key === "Enter") loginAuth();
+});
+
+async function intentarLoginDesdeGate() {
+  ocultarErrorGate();
+  if ($("auth-email")) $("auth-email").value = $("gate-email")?.value.trim() || "";
+  if ($("auth-password")) $("auth-password").value = $("gate-password")?.value || "";
+  await loginAuth();
+  if (state.authUser) {
+    if ($("gate-password")) $("gate-password").value = "";
+    ocultarGateAcceso();
+  } else {
+    mostrarErrorGate(traducirErrorAuth($("status")?.textContent));
+  }
+}
+
+function traducirErrorAuth(mensaje) {
+  const texto = String(mensaje || "");
+  if (texto.includes("Invalid login credentials")) return "Correo o contraseña incorrectos.";
+  if (texto.includes("Email not confirmed")) return "Ese correo aún no ha sido confirmado.";
+  if (texto.includes("correo y contraseña")) return texto;
+  return texto || "No se pudo iniciar sesión. Revisa tu correo y contraseña.";
+}
+
+$("gate-login-btn")?.addEventListener("click", intentarLoginDesdeGate);
+$("gate-email")?.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") intentarLoginDesdeGate();
+});
+$("gate-password")?.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") intentarLoginDesdeGate();
+});
+
+$("gate-continue-btn")?.addEventListener("click", async () => {
+  const rol = $("gate-role-select")?.value || "SUPERVISOR";
+  const empresaId = $("gate-empresa-select")?.value || "";
+  if (!empresaId) {
+    mostrarErrorGate("Selecciona una empresa antes de continuar.");
+    return;
+  }
+  ocultarErrorGate();
+  state.sessionRole = rol;
+  state.empresaId = empresaId;
+  if ($("role-select")) $("role-select").value = rol;
+  if ($("empresa-select")) $("empresa-select").value = empresaId;
+  ocultarGateAcceso();
+  setStatus("Cargando equipos de la empresa seleccionada...");
+  await loadEquipos();
 });
 
 sb.auth.onAuthStateChange((_event, session) => {
