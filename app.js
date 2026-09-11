@@ -35,6 +35,8 @@ const state = {
   fotoCounts: {},
   levantamientoLoading: false,
   selectedEquipoId: "",
+  equipoFormAbierto: false,
+  editandoEquipoId: "",
   selectedTareaId: "",
   selectedExtraId: "",
   selectedHorasTecnico: "",
@@ -3247,6 +3249,112 @@ function renderDashboard() {
   }).join("") || `<div class="area-row muted">Esta empresa no tiene equipos cargados todavía.</div>`;
 }
 
+async function guardarEquipo() {
+  if (!isSupervisorMode()) {
+    mostrarAvisoFlotante("Solo supervisor/admin puede dar de alta equipos.", "error");
+    return;
+  }
+  const idTag = $("equipo-id-tag")?.value.trim();
+  const nombreEquipo = $("equipo-nombre")?.value.trim();
+  const area = $("equipo-area")?.value.trim();
+  const proceso = $("equipo-proceso")?.value.trim();
+  const sistema = $("equipo-sistema")?.value.trim();
+  const criticidad = $("equipo-criticidad")?.value || "C";
+
+  if (!idTag || !nombreEquipo) {
+    mostrarAvisoFlotante("Escribe al menos el ID TAG y el nombre del equipo antes de guardar.", "error");
+    return;
+  }
+
+  const editandoId = state.editandoEquipoId;
+  const editando = editandoId ? state.equipos.find(item => String(item.id) === String(editandoId)) : null;
+
+  const payload = {
+    id_tag: idTag,
+    nombre_equipo: nombreEquipo,
+    area: area || null,
+    proceso: proceso || null,
+    sistema: sistema || null,
+    criticidad,
+    activo: true
+  };
+
+  const { error } = editando
+    ? await sb.from(cfg.tables.equipos).update(payload).eq("id", editando.id).select("id").single()
+    : await sb.from(cfg.tables.equipos).insert({ ...payload, empresa_id: state.empresaId }).select("id").single();
+
+  if (error) {
+    mostrarAvisoFlotante(`No se pudo guardar el equipo: ${error.message}. Corre el Paso 32 en Supabase si aún no lo has corrido.`, "error");
+    return;
+  }
+
+  state.editandoEquipoId = "";
+  state.equipoFormAbierto = false;
+  await loadEquipos();
+  mostrarAvisoFlotante(editando ? "Cambios guardados." : "Equipo dado de alta.", "ok");
+}
+
+function editarEquipo(id) {
+  if (!isSupervisorMode()) return;
+  state.editandoEquipoId = id;
+  state.equipoFormAbierto = true;
+  renderEquipos();
+  $("equipo-form-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function cancelarEdicionEquipo() {
+  state.editandoEquipoId = "";
+  state.equipoFormAbierto = false;
+  renderEquipos();
+}
+
+function toggleEquipoForm() {
+  state.equipoFormAbierto = !state.equipoFormAbierto;
+  if (!state.equipoFormAbierto) state.editandoEquipoId = "";
+  renderEquipos();
+}
+
+function renderEquipoFormPanel() {
+  const panel = $("equipo-form-panel");
+  const boton = $("equipos-add-btn");
+  if (!panel) return;
+  if (boton) boton.classList.toggle("hidden", !isSupervisorMode());
+  const editando = state.editandoEquipoId ? state.equipos.find(item => String(item.id) === String(state.editandoEquipoId)) : null;
+  const abierto = isSupervisorMode() && (state.equipoFormAbierto || Boolean(editando));
+  if (boton) boton.textContent = abierto ? "✕ Cerrar" : "+ Agregar equipo";
+  if (!abierto) {
+    panel.innerHTML = "";
+    return;
+  }
+  const crit = String(editando?.criticidad || "C").toUpperCase();
+  panel.innerHTML = `
+    <section class="equipo-form-panel">
+      <h3>${editando ? `Editar: ${escapeHtml(editando.nombre_equipo || editando.id_tag || "")}` : "Dar de alta equipo"}</h3>
+      <div class="form-preview">
+        <div class="two-cols">
+          <label>ID TAG<input id="equipo-id-tag" placeholder="Ej: THE-6210" value="${escapeHtml(editando?.id_tag || "")}"></label>
+          <label>Nombre del equipo<input id="equipo-nombre" placeholder="Ej: Transportador helicoidal #3" value="${escapeHtml(editando?.nombre_equipo || "")}"></label>
+        </div>
+        <div class="two-cols">
+          <label>Área<input id="equipo-area" placeholder="Ej: Ensacado sílice" value="${escapeHtml(editando?.area || "")}"></label>
+          <label>Proceso<input id="equipo-proceso" placeholder="Ej: Ensacadora 1" value="${escapeHtml(editando?.proceso || "")}"></label>
+        </div>
+        <div class="two-cols">
+          <label>Sistema<input id="equipo-sistema" placeholder="Ej: Sistema de transmisión" value="${escapeHtml(editando?.sistema || "")}"></label>
+          <label>Criticidad<select id="equipo-criticidad">
+            <option value="A" ${crit === "A" ? "selected" : ""}>A</option>
+            <option value="B" ${(!editando || crit === "B") ? "selected" : ""}>B</option>
+            <option value="C" ${crit === "C" ? "selected" : ""}>C</option>
+          </select></label>
+        </div>
+        <div class="form-action">
+          ${editando ? `<button class="ghost-action" onclick="cancelarEdicionEquipo()">Cancelar</button>` : ""}
+          <button class="primary-action" onclick="guardarEquipo()">${editando ? "Guardar cambios" : "Dar de alta"}</button>
+        </div>
+      </div>
+    </section>`;
+}
+
 function renderEquipos() {
   const q = $("search").value.trim().toLowerCase();
   const areaFiltro = state.equiposAreaFiltro;
@@ -3256,6 +3364,7 @@ function renderEquipos() {
     areaSelect.innerHTML = `<option value="">Todas las áreas</option>` +
       areas.map(area => `<option value="${escapeHtml(area)}" ${area === areaFiltro ? "selected" : ""}>${escapeHtml(area)}</option>`).join("");
   }
+  renderEquipoFormPanel();
   const equipos = state.equipos.filter(e => {
     const haystack = [e.id_tag, e.nombre_equipo, e.area, e.proceso, e.sistema].join(" ").toLowerCase();
     const matchQ = !q || haystack.includes(q);
@@ -3265,7 +3374,7 @@ function renderEquipos() {
   $("equipos-list").innerHTML = equipos.map(e => {
     const crit = String(e.criticidad || "C").toUpperCase();
     const fotoCount = state.fotoCounts[e.id] || 0;
-    return `<button class="equipo-row equipo-button ${e.id === state.selectedEquipoId ? "selected" : ""}" onclick="selectEquipo('${escapeHtml(e.id)}')">
+    return `<div class="equipo-row equipo-button ${e.id === state.selectedEquipoId ? "selected" : ""}" onclick="selectEquipo('${escapeHtml(e.id)}')" role="button" tabindex="0">
       <div class="equipo-top">
         <div>
           <div class="tag">${escapeHtml(e.id_tag || "SIN TAG")}</div>
@@ -3275,9 +3384,10 @@ function renderEquipos() {
         <div class="row-badges">
           ${fotoCount ? `<span class="pill photo-pill">${fotoCount} fotos</span>` : ""}
           <span class="pill crit-${escapeHtml(crit)}">Crit ${escapeHtml(crit)}</span>
+          ${isSupervisorMode() ? `<button class="icon-edit-button" title="Editar equipo" onclick="event.stopPropagation();editarEquipo('${escapeHtml(e.id)}')">✎</button>` : ""}
         </div>
       </div>
-    </button>`;
+    </div>`;
   }).join("") || `<div class="equipo-row muted">Sin resultados.</div>`;
 }
 
