@@ -56,7 +56,8 @@ const state = {
   moduleSource: "local",
   authSession: null,
   authUser: null,
-  authPerfil: null
+  authPerfil: null,
+  authPerfiles: []
 };
 
 const $ = (id) => document.getElementById(id);
@@ -277,13 +278,9 @@ function authDisplayName() {
   return state.authPerfil?.nombre || state.authUser?.email || "Sesión real";
 }
 
-function esAdminMolub() {
-  return String(state.authPerfil?.rol || "").toUpperCase().includes("MOLUB");
-}
-
 function syncAuthLockedControls() {
   const locked = Boolean(state.authUser);
-  const lockCompany = locked && !esAdminMolub();
+  const lockCompany = locked && !puedeElegirEmpresa();
   if ($("role-select")) $("role-select").disabled = locked;
   if ($("empresa-select")) $("empresa-select").disabled = lockCompany;
   document.querySelector(".role-picker")?.classList.toggle("hidden", locked);
@@ -299,7 +296,7 @@ function renderAuthPanel() {
   $("sidebar-auth-session")?.classList.toggle("hidden", !logged);
   if ($("sidebar-auth-user-label")) $("sidebar-auth-user-label").textContent = logged ? authDisplayName() : "Sin sesión";
 
-  const rolMostrado = esAdminMolub() ? "Admin MOLUB" : roleLabel(state.sessionRole);
+  const rolMostrado = esAdminMolub() ? "Admin MOLUB" : esComisionista() ? "Comisionista" : roleLabel(state.sessionRole);
   const msg = $("auth-message");
   if (msg) {
     msg.textContent = locked
@@ -315,49 +312,80 @@ function renderAuthPanel() {
   syncAuthLockedControls();
 }
 
-async function fetchAuthPerfil(user) {
-  if (!cfg.tables.perfiles || !user) return null;
+async function fetchAuthPerfiles(user) {
+  if (!cfg.tables.perfiles || !user) return [];
 
+  // Una persona puede tener mas de una fila aqui: un comisionista, por
+  // ejemplo, tiene una fila por cada cliente que cerro (mismo login,
+  // una empresa_id distinta en cada una). Por eso esto ya no usa
+  // maybeSingle() - se traen todas las filas activas de este usuario.
   const { data, error } = await sb
     .from(cfg.tables.perfiles)
     .select("id,empresa_id,nombre,rol,activo,email,auth_user_id")
     .eq("activo", true)
-    .eq("auth_user_id", user.id)
-    .maybeSingle();
+    .eq("auth_user_id", user.id);
 
   if (error) console.warn("No se pudo buscar perfil por auth_user_id:", error.message);
-  if (data) return data;
+  if (data && data.length) return data;
 
   const email = String(user.email || "").trim();
-  if (!email) return null;
+  if (!email) return [];
 
   const fallback = await sb
     .from(cfg.tables.perfiles)
     .select("id,empresa_id,nombre,rol,activo,email,auth_user_id")
     .eq("activo", true)
-    .ilike("email", email)
-    .maybeSingle();
+    .ilike("email", email);
 
   if (fallback.error) {
     console.warn("No se pudo buscar perfil por email:", fallback.error.message);
-    return null;
+    return [];
   }
-  return fallback.data || null;
+  return fallback.data || [];
+}
+
+function elegirAuthPerfilParaEmpresa(empresaId) {
+  const perfiles = state.authPerfiles || [];
+  return perfiles.find(p => String(p.empresa_id) === String(empresaId)) || perfiles[0] || null;
+}
+
+function esAdminMolub() {
+  return (state.authPerfiles || []).some(p => String(p.rol || "").toUpperCase().includes("MOLUB"));
+}
+
+function esComisionista() {
+  return (state.authPerfiles || []).some(p => String(p.rol || "").toUpperCase().includes("COMISION"));
+}
+
+function empresasPermitidasAuth() {
+  // null = puede ver todas (admin MOLUB). Si no, regresa la lista de
+  // empresa_id que le corresponden a este login (una sola para un
+  // tecnico/supervisor normal, varias para un comisionista).
+  if (esAdminMolub()) return null;
+  return [...new Set((state.authPerfiles || []).map(p => p.empresa_id).filter(Boolean))];
+}
+
+function puedeElegirEmpresa() {
+  if (!state.authUser) return false;
+  const permitidas = empresasPermitidasAuth();
+  return permitidas === null || permitidas.length > 1;
 }
 
 async function applyAuthSession(session, reload = false) {
   state.authSession = session || null;
   state.authUser = session?.user || null;
-  state.authPerfil = state.authUser ? await fetchAuthPerfil(state.authUser) : null;
+  state.authPerfiles = state.authUser ? await fetchAuthPerfiles(state.authUser) : [];
+  state.authPerfil = state.authPerfiles[0] || null;
 
   if (state.authPerfil) {
-    // Un admin MOLUB puede ver cualquier empresa: solo se le pone una
-    // por default la primera vez (si no hay ninguna elegida todavia),
-    // sin regresarlo a su empresa de origen cada vez que se refresca
-    // la sesion si ya cambio a ver otra.
-    if (!esAdminMolub() || !state.empresaId) {
+    // Un admin MOLUB o un comisionista pueden ver mas de una empresa:
+    // solo se le pone una por default la primera vez (si no hay
+    // ninguna elegida todavia), sin regresarlo a su empresa de origen
+    // cada vez que se refresca la sesion si ya cambio a ver otra.
+    if (!puedeElegirEmpresa() || !state.empresaId) {
       state.empresaId = state.authPerfil.empresa_id || state.empresaId;
     }
+    state.authPerfil = elegirAuthPerfilParaEmpresa(state.empresaId);
     state.sessionRole = roleOptionFromProfile(state.authPerfil.rol);
     state.selectedUserId = isSupervisorMode() ? "" : state.authPerfil.id;
     if ($("role-select")) $("role-select").value = state.sessionRole;
@@ -412,6 +440,7 @@ async function logoutAuth() {
   state.authSession = null;
   state.authUser = null;
   state.authPerfil = null;
+  state.authPerfiles = [];
   state.selectedUserId = "";
   renderAuthPanel();
   mostrarGateAcceso();
@@ -619,10 +648,17 @@ async function loadEmpresas() {
   if (error) throw error;
   state.empresas = data || [];
   const select = $("empresa-select");
-  select.innerHTML = state.empresas
+  // Un comisionista solo debe ver en el selector las empresas de SUS
+  // clientes, no las de todos. Un admin MOLUB (empresasPermitidasAuth
+  // regresa null) si ve todas.
+  const permitidas = state.authUser ? empresasPermitidasAuth() : null;
+  const empresasVisibles = permitidas === null
+    ? state.empresas
+    : state.empresas.filter(e => permitidas.includes(e.id));
+  select.innerHTML = empresasVisibles
     .map(e => `<option value="${escapeHtml(e.id)}">${escapeHtml(e.nombre)}</option>`)
     .join("");
-  state.empresaId = state.authPerfil?.empresa_id || state.empresaId || state.empresas[0]?.id || "";
+  state.empresaId = state.authPerfil?.empresa_id || state.empresaId || empresasVisibles[0]?.id || "";
   select.value = state.empresaId;
 }
 
@@ -4342,6 +4378,19 @@ $("empresa-select").addEventListener("change", async (event) => {
   state.empresaId = event.target.value;
   state.selectedEquipoId = "";
   state.selectedUserId = "";
+  if (state.authPerfiles && state.authPerfiles.length) {
+    // Un comisionista puede tener un rol distinto guardado por cada
+    // empresa (aunque hoy sea siempre el mismo); al cambiar de
+    // empresa nos aseguramos de usar el perfil que le corresponde a
+    // la empresa recien elegida.
+    state.authPerfil = elegirAuthPerfilParaEmpresa(state.empresaId);
+    if (state.authPerfil) {
+      state.sessionRole = roleOptionFromProfile(state.authPerfil.rol);
+      state.selectedUserId = isSupervisorMode() ? "" : state.authPerfil.id;
+      if ($("role-select")) $("role-select").value = state.sessionRole;
+    }
+    renderAuthPanel();
+  }
   await loadEquipos();
 });
 
