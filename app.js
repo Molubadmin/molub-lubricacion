@@ -277,12 +277,17 @@ function authDisplayName() {
   return state.authPerfil?.nombre || state.authUser?.email || "Sesión real";
 }
 
+function esAdminMolub() {
+  return String(state.authPerfil?.rol || "").toUpperCase().includes("MOLUB");
+}
+
 function syncAuthLockedControls() {
   const locked = Boolean(state.authUser);
+  const lockCompany = locked && !esAdminMolub();
   if ($("role-select")) $("role-select").disabled = locked;
-  if ($("empresa-select")) $("empresa-select").disabled = locked;
+  if ($("empresa-select")) $("empresa-select").disabled = lockCompany;
   document.querySelector(".role-picker")?.classList.toggle("hidden", locked);
-  document.querySelector(".company-picker")?.classList.toggle("hidden", locked);
+  document.querySelector(".company-picker")?.classList.toggle("hidden", lockCompany);
 }
 
 function renderAuthPanel() {
@@ -294,10 +299,11 @@ function renderAuthPanel() {
   $("sidebar-auth-session")?.classList.toggle("hidden", !logged);
   if ($("sidebar-auth-user-label")) $("sidebar-auth-user-label").textContent = logged ? authDisplayName() : "Sin sesión";
 
+  const rolMostrado = esAdminMolub() ? "Admin MOLUB" : roleLabel(state.sessionRole);
   const msg = $("auth-message");
   if (msg) {
     msg.textContent = locked
-      ? `${authDisplayName()} · ${roleLabel(state.sessionRole)} · ${activeEmpresa()?.nombre || "sin empresa"}`
+      ? `${authDisplayName()} · ${rolMostrado} · ${activeEmpresa()?.nombre || "sin empresa"}`
       : logged
         ? "Sesión activa sin perfil vinculado. Revisa el Paso 19."
         : "Acceso por rol activo.";
@@ -305,7 +311,7 @@ function renderAuthPanel() {
   }
 
   const sessionBox = document.querySelector(".session span");
-  if (sessionBox) sessionBox.textContent = locked ? roleLabel(state.sessionRole) : "Acceso por rol";
+  if (sessionBox) sessionBox.textContent = locked ? rolMostrado : "Acceso por rol";
   syncAuthLockedControls();
 }
 
@@ -345,7 +351,13 @@ async function applyAuthSession(session, reload = false) {
   state.authPerfil = state.authUser ? await fetchAuthPerfil(state.authUser) : null;
 
   if (state.authPerfil) {
-    state.empresaId = state.authPerfil.empresa_id || state.empresaId;
+    // Un admin MOLUB puede ver cualquier empresa: solo se le pone una
+    // por default la primera vez (si no hay ninguna elegida todavia),
+    // sin regresarlo a su empresa de origen cada vez que se refresca
+    // la sesion si ya cambio a ver otra.
+    if (!esAdminMolub() || !state.empresaId) {
+      state.empresaId = state.authPerfil.empresa_id || state.empresaId;
+    }
     state.sessionRole = roleOptionFromProfile(state.authPerfil.rol);
     state.selectedUserId = isSupervisorMode() ? "" : state.authPerfil.id;
     if ($("role-select")) $("role-select").value = state.sessionRole;
@@ -674,24 +686,32 @@ async function toggleModule(id) {
 async function loadEquipos() {
   if (!state.empresaId) return;
   setStatus("Cargando equipos de la empresa seleccionada...");
-  await loadEmpresaModulos();
-  const { data, error } = await sb
+  // Antes esto hacia 10 viajes de red uno detras de otro (cada uno
+  // esperando a que terminara el anterior), lo cual hacia lenta la
+  // entrada a la app. Ninguno de estos depende del resultado de otro
+  // al momento de pedirlo, asi que se piden todos al mismo tiempo.
+  const equiposQuery = sb
     .from(cfg.tables.equipos)
     .select("id,empresa_id,area,proceso,id_tag,nombre_equipo,criticidad,sistema,activo")
     .eq("empresa_id", state.empresaId)
     .order("area")
     .order("id_tag");
-  if (error) throw error;
-  state.equipos = data || [];
-  await loadFotoCounts();
-  await loadActividades();
-  await loadTareas();
-  await loadCartas();
-  await loadElementosCartas();
-  await loadLubricantes();
-  await loadLubricanteEquipos();
-  await loadLubricantePresentaciones();
-  await loadPerfiles();
+
+  const [equiposResult] = await Promise.all([
+    equiposQuery,
+    loadEmpresaModulos(),
+    loadFotoCounts(),
+    loadActividades(),
+    loadTareas(),
+    loadCartas(),
+    loadElementosCartas(),
+    loadLubricantes(),
+    loadLubricanteEquipos(),
+    loadLubricantePresentaciones(),
+    loadPerfiles()
+  ]);
+  if (equiposResult.error) throw equiposResult.error;
+  state.equipos = equiposResult.data || [];
   if (!state.equipos.some(e => e.id === state.selectedEquipoId)) {
     state.selectedEquipoId = state.equipos[0]?.id || "";
   }
