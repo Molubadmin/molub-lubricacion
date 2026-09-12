@@ -718,13 +718,22 @@ async function loadCartas() {
   state.cartas = data || [];
 }
 
+const LUBRICANTE_SELECT_LISTA = "id,empresa_id,nombre,tipo,marca,especificacion,descripcion,codigo,nota,alias_cartas,color_nombre,color_foto_nombre,color_foto_data_url,foto_producto_nombre,foto_producto_data_url,ficha_tecnica_nombre,msds_nombre,activo,created_at";
+const LUBRICANTE_SELECT_DOCUMENTACION = "id,ficha_tecnica_nombre,ficha_tecnica_tipo,ficha_tecnica_data_url,msds_nombre,msds_tipo,msds_data_url";
+
 async function loadLubricantes() {
   state.lubricantes = [];
   if (!cfg.tables.lubricantes || !state.empresaId) return;
 
+  // Nota: NO usar select("*") aqui. Esta consulta se repite en cada
+  // recarga (loadEquipos la llama seguido), y "*" trae tambien la
+  // ficha tecnica y el MSDS de CADA lubricante (archivos pesados en
+  // base64) aunque nadie los este viendo. Eso disparo el consumo de
+  // egress de Supabase. La ficha/MSDS se cargan aparte, solo cuando
+  // se abre ese lubricante (ver cargarDocumentacionLubricante).
   const { data, error } = await sb
     .from(cfg.tables.lubricantes)
-    .select("*")
+    .select(LUBRICANTE_SELECT_LISTA)
     .eq("empresa_id", state.empresaId)
     .order("nombre");
 
@@ -733,6 +742,22 @@ async function loadLubricantes() {
     return;
   }
   state.lubricantes = data || [];
+}
+
+async function cargarDocumentacionLubricante(id) {
+  if (!id) return;
+  const idx = state.lubricantes.findIndex(l => String(l.id) === String(id));
+  if (idx === -1 || state.lubricantes[idx].__docCargada) return;
+  const { data, error } = await sb
+    .from(cfg.tables.lubricantes)
+    .select(LUBRICANTE_SELECT_DOCUMENTACION)
+    .eq("id", id)
+    .single();
+  if (error || !data) return;
+  const idxActual = state.lubricantes.findIndex(l => String(l.id) === String(id));
+  if (idxActual !== -1) {
+    state.lubricantes[idxActual] = { ...state.lubricantes[idxActual], ...data, __docCargada: true };
+  }
 }
 
 async function loadLubricanteEquipos() {
@@ -882,7 +907,20 @@ async function guardarLubricante() {
   }
 
   const editandoId = state.editandoLubricanteId;
-  const editando = editandoId ? state.lubricantes.find(item => String(item.id) === String(editandoId)) : null;
+  let editando = editandoId ? state.lubricantes.find(item => String(item.id) === String(editandoId)) : null;
+
+  if (editando && !editando.__docCargada) {
+    // Aseguramos tener la ficha tecnica y el MSDS actuales antes de
+    // guardar: si no se cargan, el update de abajo los borraria por
+    // accidente cada vez que se edita el lubricante sin volver a
+    // subir esos archivos.
+    await cargarDocumentacionLubricante(editando.id);
+    editando = state.lubricantes.find(item => String(item.id) === String(editandoId));
+    if (!editando?.__docCargada) {
+      mostrarAvisoFlotante("No se pudo confirmar la ficha técnica/MSDS actuales (sin conexión). Intenta guardar de nuevo para no perderlas.", "error");
+      return;
+    }
+  }
 
   let fotoDataUrl = editando?.foto_producto_data_url || null;
   let fotoNombre = editando?.foto_producto_nombre || null;
@@ -951,6 +989,23 @@ async function guardarLubricante() {
   ["lub-foto-preview", "lub-color-foto-preview", "lub-ficha-preview", "lub-msds-preview"].forEach(id => { if ($(id)) $(id).innerHTML = ""; });
   state.editandoLubricanteId = "";
   await loadLubricantes();
+  const idGuardado = editando?.id || guardado?.id;
+  const idxGuardado = idGuardado ? state.lubricantes.findIndex(l => String(l.id) === String(idGuardado)) : -1;
+  if (idxGuardado !== -1) {
+    // Ya tenemos estos datos en memoria (recien subidos): los
+    // completamos aqui para no tener que volver a pedirlos a
+    // Supabase (evita otro round-trip pesado justo despues de guardar).
+    state.lubricantes[idxGuardado] = {
+      ...state.lubricantes[idxGuardado],
+      ficha_tecnica_nombre: fichaNombre,
+      ficha_tecnica_tipo: fichaTipo,
+      ficha_tecnica_data_url: fichaDataUrl,
+      msds_nombre: msdsNombre,
+      msds_tipo: msdsTipo,
+      msds_data_url: msdsDataUrl,
+      __docCargada: true
+    };
+  }
   renderModules();
   mostrarAvisoFlotante(editando ? "Cambios guardados." : "Lubricante dado de alta.", "ok");
 
@@ -1051,13 +1106,15 @@ async function autoAsociarEquiposLubricante(lubricanteId, opciones = {}) {
   mostrarAvisoFlotante(`Se asociaron ${nuevas.length} punto${nuevas.length === 1 ? "" : "s"} de lubricación automáticamente.`, "ok");
 }
 
-function editarLubricante(id) {
+async function editarLubricante(id) {
   if (!isSupervisorMode()) return;
   state.editandoLubricanteId = id;
   state.lubricanteFormAbierto = true;
   state.lubricanteDetailMode = false;
   renderModules();
   document.getElementById("lub-nombre")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  await cargarDocumentacionLubricante(id);
+  if (String(state.editandoLubricanteId) === String(id)) renderModules();
 }
 
 function cancelarEdicionLubricante() {
@@ -1097,7 +1154,7 @@ function previewColorFotoLubricante(input) { previewArchivoLubricante(input, "lu
 function previewFichaLubricante(input) { previewArchivoLubricante(input, "lub-ficha-preview", false); }
 function previewMsdsLubricante(input) { previewArchivoLubricante(input, "lub-msds-preview", false); }
 
-function seleccionarLubricante(id) {
+async function seleccionarLubricante(id) {
   state.selectedLubricanteId = id;
   state.lubricanteDetailMode = true;
   state.lubricanteTab = "equipos";
@@ -1105,6 +1162,8 @@ function seleccionarLubricante(id) {
   state.lubricantePresentacionFormAbierto = false;
   state.lubricanteAliasPickerAbierto = false;
   renderModules();
+  await cargarDocumentacionLubricante(id);
+  if (String(state.selectedLubricanteId) === String(id)) renderModules();
 }
 
 function volverListaLubricantes() {
@@ -1444,6 +1503,10 @@ async function subirDocumentoLubricante(lubricanteId, prefix, input) {
     return;
   }
   await loadLubricantes();
+  // loadLubricantes trae la lista liviana (sin ficha/MSDS); hay que
+  // volver a traer la documentacion completa de este lubricante para
+  // no perder de vista el otro documento (ficha o MSDS) en pantalla.
+  await cargarDocumentacionLubricante(lubricanteId);
   renderModules();
   mostrarAvisoFlotante("Documento actualizado.", "ok");
 }
@@ -1527,13 +1590,21 @@ async function eliminarLubricante(id) {
   mostrarAvisoFlotante("Lubricante eliminado.", "ok");
 }
 
+const ELEMENTOS_CARTA_SELECT_LISTA = "id,empresa_id,carta_id,equipo_id,npunto,orden,elemento,nombre,descripcion,lubricante,lub_inicial,relub,tipo,gramos,bombazos,litros,frecuencia,tarea,intervalo_muestreo,temp_real,created_at,updated_at";
+
 async function loadElementosCartas() {
   state.elementosCartas = [];
   if (!cfg.tables.elementosCartas || !state.empresaId) return;
 
+  // Nota: igual que con lubricantes y fotos, aqui NO se pide la foto
+  // de cada punto (foto_url puede traer la imagen completa en
+  // base64). Con cartas ya guardadas puede haber cientos de estas
+  // filas, y se recargaban completas en cada loadEquipos(). La foto
+  // se trae aparte, solo para la carta que se este viendo (ver
+  // cargarFotosDeElementosCarta).
   const { data, error } = await sb
     .from(cfg.tables.elementosCartas)
-    .select("*")
+    .select(ELEMENTOS_CARTA_SELECT_LISTA)
     .eq("empresa_id", state.empresaId)
     .limit(1500);
 
@@ -1541,7 +1612,31 @@ async function loadElementosCartas() {
     console.warn("No se pudieron cargar elementos de cartas:", error.message);
     return;
   }
-  state.elementosCartas = await Promise.all((data || []).map(withSignedFotoUrl));
+  state.elementosCartas = data || [];
+}
+
+async function cargarFotosDeElementosCarta(cartaId, equipoId) {
+  if (!cfg.tables.elementosCartas) return;
+  const filtros = [];
+  if (cartaId && !String(cartaId).startsWith("auto-") && !String(cartaId).startsWith("pendiente-")) filtros.push(`carta_id.eq.${cartaId}`);
+  if (equipoId) filtros.push(`equipo_id.eq.${equipoId}`);
+  if (!filtros.length) return;
+  const yaCompletos = (state.elementosCartas || []).some(el =>
+    (String(el.carta_id) === String(cartaId) || String(el.equipo_id) === String(equipoId)) && el.__fotoCargada);
+  if (yaCompletos) return;
+  const { data, error } = await sb
+    .from(cfg.tables.elementosCartas)
+    .select("id,foto_url")
+    .eq("empresa_id", state.empresaId)
+    .or(filtros.join(","));
+  if (error) {
+    console.warn("No se pudieron cargar las fotos de los puntos de esta carta:", error.message);
+    return;
+  }
+  const porId = new Map((data || []).map(row => [String(row.id), row]));
+  state.elementosCartas = (state.elementosCartas || []).map(el =>
+    porId.has(String(el.id)) ? { ...el, ...porId.get(String(el.id)), __fotoCargada: true } : el
+  );
 }
 
 async function loadActividades() {
@@ -2171,11 +2266,18 @@ function selectedCarta() {
   return rows.find(carta => String(carta.id) === String(state.selectedCartaId)) || rows[0];
 }
 
-function seleccionarCarta(id) {
+async function seleccionarCarta(id) {
   state.selectedCartaId = id;
   state.cartaDetailMode = true;
   renderModules();
   setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 0);
+  const carta = selectedCarta();
+  const equipo = cartaEquipo(carta);
+  await Promise.all([
+    equipo?.id ? cargarFotosDeEquipoConUrl(equipo.id) : Promise.resolve(),
+    cargarFotosDeElementosCarta(id, equipo?.id)
+  ]);
+  if (String(state.selectedCartaId) === String(id)) renderModules();
 }
 
 function volverListaCartas() {
@@ -2392,6 +2494,14 @@ async function guardarCartaCompleta() {
     setStatus("No se encontro el equipo de esta carta.", "warn");
     return;
   }
+  // Por seguridad: si esta carta todavia no tiene puntos guardados,
+  // sus filas se arman a partir de las fotos de levantamiento del
+  // equipo. Nos aseguramos de tenerlas completas (con url) antes de
+  // guardar, para no perder la foto de cada punto en el primer guardado.
+  await Promise.all([
+    cargarFotosDeEquipoConUrl(equipo.id),
+    cargarFotosDeElementosCarta(carta.id, equipo.id)
+  ]);
   const elementosActuales = elementosForCarta(carta, equipo);
   const firmas = {
     reviso: $("carta-editor-reviso")?.value.trim() || "",
@@ -2944,9 +3054,16 @@ async function loadFotoCounts() {
   state.fotosEmpresa = [];
   if (!cfg.tables.fotos || !state.empresaId) return;
 
+  // Nota: esto se ejecuta en cada recarga de equipos (loadEquipos la
+  // llama seguido). Aqui solo hace falta contar fotos por equipo y
+  // saber su tipo/categoria para las listas; el contenido real de la
+  // foto (columna "url", que guarda la imagen en base64) pesa mucho
+  // y solo se necesita al abrir un equipo o una carta en detalle. Por
+  // eso NO se pide con select("*") - esto era la causa principal del
+  // consumo alto de egress en Supabase.
   const { data, error } = await sb
     .from(cfg.tables.fotos)
-    .select("*")
+    .select("id,empresa_id,equipo_id,tipo,categoria,created_at")
     .eq("empresa_id", state.empresaId)
     .limit(2000);
 
@@ -2955,11 +3072,31 @@ async function loadFotoCounts() {
     return;
   }
 
-  state.fotosEmpresa = await Promise.all((data || []).map(withSignedFotoUrl));
+  state.fotosEmpresa = data || [];
   state.fotosEmpresa.forEach(row => {
     if (!row.equipo_id) return;
     state.fotoCounts[row.equipo_id] = (state.fotoCounts[row.equipo_id] || 0) + 1;
   });
+}
+
+async function cargarFotosDeEquipoConUrl(equipoId) {
+  if (!equipoId || !cfg.tables.fotos) return;
+  const yaCompletas = (state.fotosEmpresa || []).some(f => String(f.equipo_id) === String(equipoId) && f.__urlCargada);
+  if (yaCompletas) return;
+  const { data, error } = await sb
+    .from(cfg.tables.fotos)
+    .select("id,empresa_id,equipo_id,usuario_id,tipo,categoria,url,storage_path,file_name,mime_type,created_at")
+    .eq("empresa_id", state.empresaId)
+    .eq("equipo_id", equipoId);
+  if (error) {
+    console.warn("No se pudieron cargar las fotos de este equipo:", error.message);
+    return;
+  }
+  const completas = await Promise.all((data || []).map(async row => ({ ...(await withSignedFotoUrl(row)), __urlCargada: true })));
+  state.fotosEmpresa = [
+    ...(state.fotosEmpresa || []).filter(f => String(f.equipo_id) !== String(equipoId)),
+    ...completas
+  ];
 }
 
 function selectedEquipo() {
@@ -3096,6 +3233,17 @@ async function loadLevantamientoForSelectedEquipo() {
 
     state.levantamiento = levantamientoResult.data?.[0] || null;
     state.fotos = await Promise.all((fotosResult.data || []).map(withSignedFotoUrl));
+    if (!state.fotos.length) {
+      // Este equipo no tiene fotos propias todavia; la galeria cae
+      // en mostrar las fotos de su carta guardada (si tiene). Nos
+      // aseguramos de tener esas fotos completas para que no salgan
+      // rotas.
+      const carta = cartaForEquipo(equipo.id);
+      await Promise.all([
+        cargarFotosDeEquipoConUrl(equipo.id),
+        cargarFotosDeElementosCarta(carta?.id, equipo.id)
+      ]);
+    }
   } catch (err) {
     console.warn("No se pudo cargar levantamiento/fotos:", err.message);
     setStatus(`No se pudo leer levantamiento/fotos: ${err.message}`, "warn");
@@ -3773,7 +3921,7 @@ function renderModules() {
               ${presPrincipal ? `<span class="lubricante-card-spec">${escapeHtml(presentacionTexto(presPrincipal))}</span>` : ""}
               <span class="lubricante-card-equipos">⚙️ ${equiposCount} equipo${equiposCount === 1 ? "" : "s"} asociado${equiposCount === 1 ? "" : "s"}</span>
             </div>
-            ${(l.ficha_tecnica_data_url || l.msds_data_url) ? `<span class="lubricante-card-ficha" title="Tiene documentos adjuntos">📎</span>` : ""}
+            ${(l.ficha_tecnica_nombre || l.msds_nombre) ? `<span class="lubricante-card-ficha" title="Tiene documentos adjuntos">📎</span>` : ""}
           </article>`;
         }).join("") : `<div class="empty-state">${state.lubricantes.length ? "Sin resultados con estos filtros." : "Todavía no hay lubricantes dados de alta para esta empresa."}</div>`;
 
