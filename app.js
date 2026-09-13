@@ -719,7 +719,24 @@ async function toggleModule(id) {
   render();
 }
 
-async function loadEquipos() {
+let loadEquiposEnCurso = null;
+
+function loadEquipos() {
+  // Supabase a veces dispara mas de un evento de sesion seguido
+  // (por ejemplo al refrescar el token), y cada uno intentaba
+  // recargar todo por su cuenta. Si dos cargas corrian encimadas,
+  // el conteo de fotos por equipo se sumaba dos veces (6 fotos
+  // aparecian como 12) porque ambas escribian sobre el mismo
+  // objeto en memoria. Ahora, si ya hay una carga en curso, todos
+  // se unen a esa misma en vez de disparar otra por separado.
+  if (loadEquiposEnCurso) return loadEquiposEnCurso;
+  loadEquiposEnCurso = loadEquiposInterno().finally(() => {
+    loadEquiposEnCurso = null;
+  });
+  return loadEquiposEnCurso;
+}
+
+async function loadEquiposInterno() {
   if (!state.empresaId) return;
   setStatus("Cargando equipos de la empresa seleccionada...");
   // Antes esto hacia 10 viajes de red uno detras de otro (cada uno
@@ -3128,11 +3145,13 @@ async function loadFotoCounts() {
     return;
   }
 
-  state.fotosEmpresa = data || [];
-  state.fotosEmpresa.forEach(row => {
+  const conteo = {};
+  (data || []).forEach(row => {
     if (!row.equipo_id) return;
-    state.fotoCounts[row.equipo_id] = (state.fotoCounts[row.equipo_id] || 0) + 1;
+    conteo[row.equipo_id] = (conteo[row.equipo_id] || 0) + 1;
   });
+  state.fotosEmpresa = data || [];
+  state.fotoCounts = conteo;
 }
 
 async function cargarFotosDeEquipoConUrl(equipoId) {
