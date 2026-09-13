@@ -2239,9 +2239,14 @@ function elementoBombaLitros(elemento) {
 
 function cartaStatus(carta) {
   const raw = String(firstValue(carta, ["status", "estado"], "guardada")).toLowerCase();
+  if (raw.includes("pend")) return "Pendiente";
   if (raw.includes("guard")) return "Guardada";
   if (raw.includes("aprob")) return "Guardada";
   return raw || "Guardada";
+}
+
+function cartaStatusPillClass(carta) {
+  return cartaStatus(carta) === "Pendiente" ? "saved-pill pendiente" : "saved-pill";
 }
 
 function elementosForCarta(carta, equipo = cartaEquipo(carta)) {
@@ -3388,6 +3393,9 @@ async function guardarFotoLevantamiento() {
     await loadLevantamientoForSelectedEquipo();
     renderEquipos();
     setStatus("Foto de levantamiento guardada.", "");
+    if (!cartaForEquipo(equipo.id)) {
+      mostrarAvisoFlotante(`Levantamiento guardado. La carta de ${equipo.id_tag || equipo.nombre_equipo} sigue Pendiente hasta que la llenes y le des "Guardar carta".`, "ok");
+    }
   } catch (err) {
     console.warn("No se pudo guardar foto:", err.message);
     setStatus(`No se pudo guardar foto: ${err.message}`, "error");
@@ -4085,7 +4093,6 @@ function renderModules() {
         const cartasHtml = cartas.length ? cartas.map(row => {
           const rowEquipo = cartaEquipo(row);
           const selected = String(row.id) === String(state.selectedCartaId);
-          const isMigrada = !String(row.id || "").startsWith("pendiente-");
           const fecha = cartaFecha(row);
           return `
             <article class="carta-list-row ${selected ? "selected" : ""}" onclick="seleccionarCarta('${escapeHtml(row.id)}')" title="Ver carta">
@@ -4096,7 +4103,7 @@ function renderModules() {
                 <small>${escapeHtml(cartaArea(row, rowEquipo))} - Criticidad ${escapeHtml(cartaCriticidad(row, rowEquipo))} - ${escapeHtml(elementosForCarta(row, rowEquipo).length || firstValue(row, ["puntos_lubricacion", "elementos"], "0"))} puntos lubricacion</small>
               </div>
               <div class="carta-list-status">
-                <span class="saved-pill">${isMigrada ? cartaStatus(row) : "Pendiente"}</span>
+                <span class="${cartaStatusPillClass(row)}">${escapeHtml(cartaStatus(row))}</span>
                 <small>${escapeHtml(fecha)}</small>
               </div>
               <span class="arrow-link" aria-hidden="true">&rsaquo;</span>
