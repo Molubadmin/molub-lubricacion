@@ -142,6 +142,37 @@ body.vista-qr .app{padding-top:24px!important}
 .primary-action:hover{filter:brightness(.92)}
 .equipo-form-panel .ghost-action{background:#fff;border:1px solid var(--line);color:var(--muted);border-radius:10px;padding:11px 16px;font-weight:900;font:inherit;cursor:pointer}
 .equipo-form-panel .ghost-action:hover{border-color:var(--blue);color:var(--blue)}
+
+/* Matriz RACI */
+.raci-leyenda{display:flex;flex-wrap:wrap;gap:16px;margin:14px 0;padding:14px 16px;background:#f8faff;border:1px solid var(--line);border-radius:12px}
+.raci-leyenda-item{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink)}
+.raci-badge{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:8px;font-weight:900;font-size:12px;color:#fff;flex:none}
+.raci-badge.raci-R{background:var(--blue)}
+.raci-badge.raci-A{background:var(--ink)}
+.raci-badge.raci-C{background:#64708b}
+.raci-badge.raci-I{background:#9aa6c3}
+.raci-table-wrap{overflow-x:auto;margin-bottom:14px}
+.raci-table{border-collapse:collapse;width:100%;min-width:640px}
+.raci-table th,.raci-table td{border:1px solid var(--line);padding:8px 10px;text-align:center;vertical-align:middle}
+.raci-table thead th{background:#f7f9ff;color:var(--blue);font-size:11px;text-transform:uppercase;letter-spacing:.3px;font-weight:900}
+.raci-table thead th:first-child,.raci-table td.raci-actividad-cell{text-align:left;min-width:220px}
+.raci-col-head{display:flex;align-items:center;gap:6px;justify-content:center}
+.raci-rol-input{width:100%;min-width:90px;border:1px solid var(--line);border-radius:8px;padding:6px 8px;font:inherit;font-size:12px;font-weight:900;color:var(--blue);text-transform:none;text-align:center}
+.raci-act-input{width:100%;border:1px solid var(--line);border-radius:8px;padding:7px 9px;font:inherit;font-size:13px;color:var(--ink)}
+.raci-valor-cell{width:64px}
+.raci-select{border:1px solid var(--line);border-radius:8px;padding:6px 4px;font-weight:900;font-size:12px;width:56px;cursor:pointer;background:#fff;color:var(--ink)}
+.raci-select.raci-R{background:var(--blue);color:#fff;border-color:var(--blue)}
+.raci-select.raci-A{background:var(--ink);color:#fff;border-color:var(--ink)}
+.raci-select.raci-C{background:#64708b;color:#fff;border-color:#64708b}
+.raci-select.raci-I{background:#9aa6c3;color:#fff;border-color:#9aa6c3}
+.raci-table .icon-danger-button,.raci-col-head .icon-danger-button{width:24px;height:24px;border:0;border-radius:999px;background:#f1f2fb;color:#5a6280;display:inline-flex;align-items:center;justify-content:center;padding:0;font-size:14px;line-height:1;cursor:pointer;flex:none}
+.raci-table .icon-danger-button:hover,.raci-col-head .icon-danger-button:hover{background:#fdecec;color:var(--red)}
+.raci-quitar-fila{width:34px}
+.raci-actions{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
+.raci-actions .secondary-action{border:1px solid var(--line);background:#fff;color:var(--blue);border-radius:10px;padding:11px 16px;font-weight:900;font:inherit;cursor:pointer}
+.raci-actions .secondary-action:hover{border-color:var(--blue)}
+.raci-actions .primary-action{border:none;background:var(--blue);color:#fff;border-radius:10px;padding:11px 16px;font-weight:900;font:inherit;cursor:pointer}
+.raci-actions .primary-action:hover{filter:brightness(.92)}
 .equipo-form-panel .form-action{display:flex;gap:10px;justify-content:flex-end}
 .equipo-form-panel .form-action:has(.danger-action){justify-content:space-between}
 .equipo-form-panel .danger-action{background:#fdecec;border:1px solid #f6c6c6;color:var(--red);border-radius:10px;padding:11px 16px;font-weight:900;font:inherit;cursor:pointer}

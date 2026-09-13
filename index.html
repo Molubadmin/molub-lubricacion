@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Sistema de Gestión de Lubricación - MOLUB</title>
-  <link rel="stylesheet" href="./styles.css?v=paso78-carta-real-status-y-regresar">
+  <link rel="stylesheet" href="./styles.css?v=paso79-matriz-raci">
 </head>
 <body>
   <script>if (/[?&]carta=/.test(location.search)) document.documentElement.classList.add("cargando-carta");</script>
@@ -27,6 +27,7 @@
       <button class="nav" data-view="horas">Horas hombre</button>
       <button class="nav" data-view="cartas">Cartas realizadas</button>
       <button class="nav" data-view="lubricantes">Lubricantes</button>
+      <button class="nav" data-view="raci">Matriz RACI</button>
       <button class="nav" data-view="modulos">Módulos por empresa</button>
     </nav>
     <div class="session">
@@ -205,6 +206,10 @@
       <div class="panel module-panel"></div>
     </section>
 
+    <section id="raci" class="view module-view" data-module="raci">
+      <div class="panel module-panel"></div>
+    </section>
+
     <section id="modulos" class="view">
       <div class="panel">
         <div class="panel-head">
@@ -227,6 +232,6 @@
   <script src="./config.js?v=paso49-lubricantes-completo"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
-<script src="./app.js?v=paso78-carta-real-status-y-regresar"></script>
+<script src="./app.js?v=paso79-matriz-raci"></script>
 </body>
 </html>

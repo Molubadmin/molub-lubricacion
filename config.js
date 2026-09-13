@@ -14,6 +14,7 @@ window.MOLUB_CONFIG = {
     empresaModulos: "empresa_modulos_app",
     lubricantes: "lubricantes",
     lubricanteEquipos: "lubricante_equipos",
-    lubricantePresentaciones: "lubricante_presentaciones"
+    lubricantePresentaciones: "lubricante_presentaciones",
+    raciMatriz: "raci_matriz"
   }
 };
