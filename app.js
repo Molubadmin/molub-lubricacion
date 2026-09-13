@@ -2237,16 +2237,25 @@ function elementoBombaLitros(elemento) {
   return [bombazos ? `${bombazos} bomb.` : "", litros ? `${litros} L` : ""].filter(Boolean).join(" / ");
 }
 
-function cartaStatus(carta) {
+function cartaTienePuntosConLubricante(carta, equipo) {
+  return elementosForCarta(carta, equipo).some(el => String(firstValue(el, ["lubricante", "lub", "producto"], "")).trim());
+}
+
+function cartaStatus(carta, equipo = cartaEquipo(carta)) {
   const raw = String(firstValue(carta, ["status", "estado"], "guardada")).toLowerCase();
   if (raw.includes("pend")) return "Pendiente";
-  if (raw.includes("guard")) return "Guardada";
-  if (raw.includes("aprob")) return "Guardada";
+  if (raw.includes("guard") || raw.includes("aprob")) {
+    // Una carta puede tener status "guardada" en la base de datos
+    // (por ejemplo, cartas viejas migradas) sin tener realmente
+    // ningun punto con lubricante capturado. Eso no cuenta como
+    // "Guardada" de verdad: sigue faltando llenarla.
+    return cartaTienePuntosConLubricante(carta, equipo) ? "Guardada" : "Pendiente";
+  }
   return raw || "Guardada";
 }
 
-function cartaStatusPillClass(carta) {
-  return cartaStatus(carta) === "Pendiente" ? "saved-pill pendiente" : "saved-pill";
+function cartaStatusPillClass(carta, equipo) {
+  return cartaStatus(carta, equipo) === "Pendiente" ? "saved-pill pendiente" : "saved-pill";
 }
 
 function elementosForCarta(carta, equipo = cartaEquipo(carta)) {
@@ -3642,6 +3651,11 @@ async function selectEquipo(id) {
   await loadLevantamientoForSelectedEquipo();
 }
 
+function volverAEquipos() {
+  setView("equipos");
+  render();
+}
+
 function renderModules() {
   $("module-settings").innerHTML = MODULES.map(m => `
     <div class="module-toggle ${moduleEnabled(m.id) ? "enabled" : ""}" onclick="toggleModule('${m.id}')">
@@ -3700,6 +3714,7 @@ function renderModules() {
         `;
         view.querySelector(".module-panel").innerHTML = equipo ? `
           <div>
+            <button type="button" class="back-action" title="Regresar a Ingresar a planta" onclick="volverAEquipos()">&#8592;</button>
             <p class="eyebrow">Levantamiento del equipo</p>
             <h2>${escapeHtml(equipo.id_tag || "SIN TAG")}</h2>
             <p><strong>${escapeHtml(equipo.nombre_equipo || "Sin nombre")}</strong></p>
@@ -4111,7 +4126,7 @@ function renderModules() {
                 <small>${escapeHtml(cartaArea(row, rowEquipo))} - Criticidad ${escapeHtml(cartaCriticidad(row, rowEquipo))} - ${escapeHtml(elementosForCarta(row, rowEquipo).length || firstValue(row, ["puntos_lubricacion", "elementos"], "0"))} puntos lubricacion</small>
               </div>
               <div class="carta-list-status">
-                <span class="${cartaStatusPillClass(row)}">${escapeHtml(cartaStatus(row))}</span>
+                <span class="${cartaStatusPillClass(row, rowEquipo)}">${escapeHtml(cartaStatus(row, rowEquipo))}</span>
                 <small>${escapeHtml(fecha)}</small>
               </div>
               <span class="arrow-link" aria-hidden="true">&rsaquo;</span>
