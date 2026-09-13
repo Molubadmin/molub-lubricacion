@@ -3520,45 +3520,35 @@ async function guardarEquipo() {
   }
 
   state.editandoEquipoId = "";
-  state.equipoFormAbierto = false;
+  cerrarModal();
   await loadEquipos();
   mostrarAvisoFlotante(editando ? "Cambios guardados." : "Equipo dado de alta.", "ok");
 }
 
-function editarEquipo(id) {
+async function eliminarEquipo(id) {
   if (!isSupervisorMode()) return;
-  state.editandoEquipoId = id;
-  state.equipoFormAbierto = true;
-  renderEquipos();
-  $("equipo-form-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
-}
+  const equipo = state.equipos.find(item => String(item.id) === String(id));
+  if (!window.confirm(`¿Eliminar el equipo ${equipo?.id_tag || ""}? Sus fotos y cartas ya guardadas NO se borran, pero el equipo dejará de aparecer en las listas. Se puede reactivar después desde Supabase si hace falta.`)) return;
 
-function cancelarEdicionEquipo() {
-  state.editandoEquipoId = "";
-  state.equipoFormAbierto = false;
-  renderEquipos();
-}
-
-function toggleEquipoForm() {
-  state.equipoFormAbierto = !state.equipoFormAbierto;
-  if (!state.equipoFormAbierto) state.editandoEquipoId = "";
-  renderEquipos();
-}
-
-function renderEquipoFormPanel() {
-  const panel = $("equipo-form-panel");
-  const boton = $("equipos-add-btn");
-  if (!panel) return;
-  if (boton) boton.classList.toggle("hidden", !isSupervisorMode());
-  const editando = state.editandoEquipoId ? state.equipos.find(item => String(item.id) === String(state.editandoEquipoId)) : null;
-  const abierto = isSupervisorMode() && (state.equipoFormAbierto || Boolean(editando));
-  if (boton) boton.textContent = abierto ? "✕ Cerrar" : "+ Agregar equipo";
-  if (!abierto) {
-    panel.innerHTML = "";
+  const { data, error } = await sb.from(cfg.tables.equipos).update({ activo: false }).eq("id", id).select("id");
+  if (!error && (!data || data.length === 0)) {
+    mostrarAvisoFlotante("Falta el permiso para editar equipos en Supabase (Paso 32).", "error");
     return;
   }
+  if (error) {
+    mostrarAvisoFlotante(`No se pudo eliminar el equipo: ${error.message}`, "error");
+    return;
+  }
+
+  state.editandoEquipoId = "";
+  cerrarModal();
+  await loadEquipos();
+  mostrarAvisoFlotante("Equipo eliminado.", "ok");
+}
+
+function formularioEquipoHtml(editando) {
   const crit = String(editando?.criticidad || "C").toUpperCase();
-  panel.innerHTML = `
+  return `
     <section class="equipo-form-panel">
       <h3>${editando ? `Editar: ${escapeHtml(editando.nombre_equipo || editando.id_tag || "")}` : "Dar de alta equipo"}</h3>
       <div class="form-preview">
@@ -3579,24 +3569,42 @@ function renderEquipoFormPanel() {
           </select></label>
         </div>
         <div class="form-action">
-          ${editando ? `<button class="ghost-action" onclick="cancelarEdicionEquipo()">Cancelar</button>` : ""}
+          ${editando ? `<button class="ghost-action danger-action" onclick="eliminarEquipo('${escapeHtml(editando.id)}')">🗑 Eliminar</button>` : ""}
+          <button class="ghost-action" onclick="cerrarModal()">Cancelar</button>
           <button class="primary-action" onclick="guardarEquipo()">${editando ? "Guardar cambios" : "Dar de alta"}</button>
         </div>
       </div>
     </section>`;
 }
 
+function abrirFormularioEquipo(id) {
+  if (!isSupervisorMode()) return;
+  state.editandoEquipoId = id || "";
+  const editando = id ? state.equipos.find(item => String(item.id) === String(id)) : null;
+  abrirModal(formularioEquipoHtml(editando));
+}
+
+function editarEquipo(id) {
+  abrirFormularioEquipo(id);
+}
+
+function toggleEquipoForm() {
+  abrirFormularioEquipo("");
+}
+
 function renderEquipos() {
   const q = $("search").value.trim().toLowerCase();
   const areaFiltro = state.equiposAreaFiltro;
+  const equiposActivos = state.equipos.filter(e => e.activo !== false);
   const areaSelect = $("equipos-area-filter");
   if (areaSelect) {
-    const areas = groupByArea(state.equipos).map(([area]) => area);
+    const areas = groupByArea(equiposActivos).map(([area]) => area);
     areaSelect.innerHTML = `<option value="">Todas las áreas</option>` +
       areas.map(area => `<option value="${escapeHtml(area)}" ${area === areaFiltro ? "selected" : ""}>${escapeHtml(area)}</option>`).join("");
   }
-  renderEquipoFormPanel();
-  const equipos = state.equipos.filter(e => {
+  const boton = $("equipos-add-btn");
+  if (boton) boton.classList.toggle("hidden", !isSupervisorMode());
+  const equipos = equiposActivos.filter(e => {
     const haystack = [e.id_tag, e.nombre_equipo, e.area, e.proceso, e.sistema].join(" ").toLowerCase();
     const matchQ = !q || haystack.includes(q);
     const matchArea = !areaFiltro || (e.area || "SIN ÁREA") === areaFiltro;
