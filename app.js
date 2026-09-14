@@ -252,7 +252,17 @@ function displayExtraPhotoName(act) {
   return act?.evidencia_foto_nombre || act?.foto_nombre || act?.cierre_foto_nombre || "Foto adjunta";
 }
 
+function esRevisorMolub() {
+  return (state.authPerfiles || []).some(p => String(p.rol || "").toUpperCase().includes("REVISOR"));
+}
+
 function roleAllowsView(view) {
+  if (esRevisorMolub()) {
+    // Cuenta de revision interna de MOLUB: edita como supervisor,
+    // pero solo ve estas 5 secciones - nada de actividades,
+    // asignaciones ni horas hombre.
+    return ["dashboard", "equipos", "levantamiento", "cartas", "lubricantes", "raci"].includes(view);
+  }
   if (isSupervisorMode()) return true;
   return ["equipos", "levantamiento", "tareas", "extras", "cartas", "lubricantes", "raci"].includes(view);
 }
@@ -300,7 +310,7 @@ function renderAuthPanel() {
   $("sidebar-auth-session")?.classList.toggle("hidden", !logged);
   if ($("sidebar-auth-user-label")) $("sidebar-auth-user-label").textContent = logged ? authDisplayName() : "Sin sesión";
 
-  const rolMostrado = esAdminMolub() ? "Admin MOLUB" : esComisionista() ? "Comisionista" : roleLabel(state.sessionRole);
+  const rolMostrado = esAdminMolub() ? "Admin MOLUB" : esComisionista() ? "Comisionista" : esRevisorMolub() ? "Revisor MOLUB" : roleLabel(state.sessionRole);
   const msg = $("auth-message");
   if (msg) {
     msg.textContent = locked
@@ -639,7 +649,7 @@ function syncNavigationForRole() {
   });
   syncUserPicker();
   if (!roleAllowsView(state.view)) {
-    setView("tareas");
+    setView(esRevisorMolub() ? "dashboard" : "tareas");
   }
 }
 
@@ -4608,9 +4618,33 @@ function toggleSidebarMobile(forzar) {
   document.querySelector(".sidebar")?.classList.toggle("open", abrir);
 }
 
+function resetearVistasDeDetalle() {
+  // Al cambiar de empresa, cualquier pantalla de "detalle" o
+  // formulario abierto (un lubricante, una carta, un equipo) sigue
+  // apuntando a un id de la empresa ANTERIOR. Si no se limpia, la
+  // pantalla se queda mostrando "Selecciona un lubricante" (o
+  // similar) en vez de la lista de la empresa nueva.
+  state.selectedEquipoId = "";
+  state.equipoFormAbierto = false;
+  state.editandoEquipoId = "";
+  state.lubricanteDetailMode = false;
+  state.selectedLubricanteId = "";
+  state.lubricanteFormAbierto = false;
+  state.editandoLubricanteId = "";
+  state.lubricanteAsociarFormAbierto = false;
+  state.lubricantePresentacionFormAbierto = false;
+  state.lubricanteAliasPickerAbierto = false;
+  state.cartaDetailMode = false;
+  state.selectedCartaId = "";
+  state.selectedCartaEquipoId = "";
+  state.selectedTareaId = "";
+  state.selectedExtraId = "";
+  state.selectedHorasTecnico = "";
+}
+
 $("empresa-select").addEventListener("change", async (event) => {
   state.empresaId = event.target.value;
-  state.selectedEquipoId = "";
+  resetearVistasDeDetalle();
   state.selectedUserId = "";
   if (state.authPerfiles && state.authPerfiles.length) {
     // Un comisionista puede tener un rol distinto guardado por cada
