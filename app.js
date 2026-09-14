@@ -43,6 +43,7 @@ const state = {
   selectedCartaEquipoId: "",
   selectedCartaId: "",
   cartaDetailMode: false,
+  imprimiendoTodas: false,
   cartaSearch: "",
   cartaAreaFiltro: "",
   equiposAreaFiltro: "",
@@ -2592,10 +2593,171 @@ function buscarCartas(value) {
   renderModules();
 }
 
+function legacyCardBodyHtml(carta, equipo, elementos) {
+  const elementosHtml = elementos.length ? elementos.map((el, index) => `
+    <tr>
+      <td class="legacy-point-photo">
+        <strong>${escapeHtml(firstValue(el, ["npunto", "orden"], index + 1))}</strong>
+        ${cartaPuntoFoto(el) ? `<img src="${escapeHtml(cartaPuntoFoto(el))}" alt="" referrerpolicy="no-referrer">` : ""}
+      </td>
+      <td>${escapeHtml(firstValue(el, ["elemento", "nombre", "componente"], "Elemento"))}</td>
+      <td>${escapeHtml(firstValue(el, ["descripcion", "desc", "detalle"], ""))}</td>
+      <td>${escapeHtml(firstValue(el, ["lubricante", "lub", "producto"], ""))}</td>
+      <td>${escapeHtml(firstValue(el, ["lub_inicial", "lubInicial", "lubricacion_inicial", "inicial"], ""))}</td>
+      <td>${escapeHtml(firstValue(el, ["relub", "re_lub", "relubricacion"], ""))}</td>
+      <td>${escapeHtml(elementoTipoCantidad(el))}</td>
+      <td>${escapeHtml(elementoBombaLitros(el))}</td>
+      <td>${escapeHtml(firstValue(el, ["frecuencia", "frec"], ""))}</td>
+      <td>${escapeHtml(firstValue(el, ["tarea", "actividad"], ""))}</td>
+      <td>${escapeHtml(firstValue(el, ["int_muestreo", "int", "intervalo_muestreo"], ""))}</td>
+      <td>${escapeHtml(firstValue(el, ["temp_real", "temp", "temperatura", "temperatura_real"], ""))}</td>
+    </tr>
+  `).join("") : `
+    <tr>
+      <td colspan="12" class="empty-table">Esta carta todavía no tiene puntos de lubricación registrados.</td>
+    </tr>
+  `;
+  const firmas = typeof carta?.firmas === "object" && carta?.firmas ? carta.firmas : {};
+  const firmaReviso = firstValue(firmas, ["reviso", "reviso_nombre"], "");
+  const firmaFecha = firstValue(firmas, ["fecha", "fecha_actualizacion"], cartaFecha(carta));
+  const firmaAutorizo = firstValue(firmas, ["autorizo", "autorizo_nombre"], "");
+  const recomendaciones = firstValue(carta, ["recomendaciones", "recomendacion", "observaciones"], "");
+  const operadorCarta = firstValue(activeUser(), ["nombre", "usuario"], "admin");
+  return `
+    <div class="legacy-card">
+      <header class="legacy-card-head">
+        <div class="legacy-brand"><img src="${escapeHtml(companyLogoUrl(activeEmpresa()) || "./assets/logo-covia.png")}" alt=""></div>
+        <div>
+          <h3>CARTA DE LUBRICACIÓN</h3>
+          <span>SISTEMA DE GESTIÓN DE LUBRICACIÓN INDUSTRIAL - MOLUB</span>
+        </div>
+        <div class="legacy-site-box">
+          <strong>PLANTA:</strong><span>${escapeHtml(firstValue(carta, ["planta"], activeEmpresa()?.nombre || "Sin planta"))}</span>
+          <strong>DIRECCIÓN:</strong><span>${escapeHtml(firstValue(carta, ["direccion"], firstValue(activeEmpresa(), ["direccion", "ubicacion"], "Lampazos de Naranjo, N.L.")))}</span>
+          <strong>FECHA:</strong><span>${escapeHtml(cartaFecha(carta))}</span>
+        </div>
+      </header>
+      <section class="legacy-equipment">
+        <div class="legacy-photo">${cartaFoto(carta, equipo) ? `<img src="${escapeHtml(cartaFoto(carta, equipo))}" alt="" referrerpolicy="no-referrer">` : `<span>Foto completa del equipo</span>`}</div>
+        <div class="legacy-meta-grid">
+          <label>NOMBRE EQUIPO<strong>${escapeHtml(cartaNombre(carta, equipo))}</strong></label>
+          <label>ID TAG<strong>${escapeHtml(cartaTag(carta, equipo))}</strong></label>
+          <label>ÁREA<strong>${escapeHtml(cartaArea(carta, equipo))}</strong></label>
+          <label>CRITICIDAD<strong>${escapeHtml(cartaCriticidad(carta, equipo))}</strong></label>
+          <label>SISTEMA<strong>${escapeHtml(cartaSistema(carta, equipo))}</strong></label>
+          <label>ELEMENTOS<strong>${escapeHtml(elementos.length)} puntos de lubricación</strong></label>
+        </div>
+      </section>
+      <div class="legacy-section-title">ELEMENTOS TRIBOLÓGICOS - PUNTOS DE LUBRICACIÓN</div>
+      <div class="legacy-table-wrap">
+        <table class="legacy-elements-table">
+          <thead>
+            <tr>
+              <th>Foto punto</th>
+              <th>Elemento</th>
+              <th>Descripción</th>
+              <th>Lubricante</th>
+              <th>Lub. inicial</th>
+              <th>Re-Lub.</th>
+              <th>Tipo / Cant.</th>
+              <th>Bomb. / Litros</th>
+              <th>Frecuencia</th>
+              <th>Tarea</th>
+              <th>Int. muestreo</th>
+              <th>Temp. real</th>
+            </tr>
+          </thead>
+          <tbody>${elementosHtml}</tbody>
+        </table>
+      </div>
+      <section class="legacy-recommendations">
+        <h4>RECOMENDACIONES DE MONITOREO E INSPECCIÓN</h4>
+        <p>${escapeHtml(recomendaciones)}</p>
+      </section>
+      <section class="legacy-signatures">
+        <div>
+          <span>REVISÓ</span>
+          <strong>Departamento de Lubricación</strong>
+          <i></i>
+          <p><b>Nombre:</b> ${escapeHtml(firmaReviso)}</p>
+        </div>
+        <div>
+          <span>FECHA DE ACTUALIZACIÓN</span>
+          <strong>Control de versiones</strong>
+          <i></i>
+          <p><b>Fecha:</b> ${escapeHtml(firmaFecha)}</p>
+        </div>
+        <div>
+          <span>AUTORIZÓ</span>
+          <strong>Autorización</strong>
+          <i></i>
+          <p><b>Nombre:</b> ${escapeHtml(firmaAutorizo)}</p>
+        </div>
+      </section>
+      <footer class="legacy-footer-bar">
+        <span>COVIA LAMPAZOS - MOLUB - Generada el ${escapeHtml(cartaFecha(carta))}</span>
+        <span>Operador: ${escapeHtml(operadorCarta)}</span>
+      </footer>
+    </div>`;
+}
+
+function construirPanelCarta(carta, equipo, elementos, detailMode) {
+  if (!carta) {
+    return `
+      <section>
+        <div class="empty-state">Selecciona una carta para ver el detalle.</div>
+      </section>
+    `;
+  }
+  return `
+    <section class="legacy-carta-preview">
+      <div class="legacy-toolbar">
+        <div>
+          ${detailMode ? `<button class="back-action" onclick="volverListaCartas()">&#8592;</button>` : ""}
+          <strong>${escapeHtml(cartaTag(carta, equipo))}</strong>
+          <span>${escapeHtml(cartaNombre(carta, equipo))}</span>
+        </div>
+        <button class="secondary-action" onclick="imprimirCarta()">Imprimir / PDF</button>
+      </div>
+      ${legacyCardBodyHtml(carta, equipo, elementos)}
+    </section>
+  `;
+}
+
 function imprimirCarta() {
   setStatus("Usa Ctrl+P o el diálogo del navegador para imprimir/PDF la carta visible.", "warn");
   window.print();
 }
+
+function cartasGuardadasDeEmpresa() {
+  return (state.cartas || []).filter(carta => cartaStatus(carta, cartaEquipo(carta)) === "Guardada");
+}
+
+function descargarTodasLasCartas() {
+  const candidatas = cartasGuardadasDeEmpresa();
+  if (!candidatas.length) {
+    mostrarAvisoFlotante("Aún no hay cartas guardadas con información capturada para descargar.", "warn");
+    return;
+  }
+  const panel = document.querySelector("#cartas .module-panel");
+  if (!panel) return;
+  const html = candidatas.map(carta => {
+    const equipo = cartaEquipo(carta);
+    const elementos = elementosForCarta(carta, equipo);
+    return `<div class="legacy-carta-preview legacy-carta-page">${legacyCardBodyHtml(carta, equipo, elementos)}</div>`;
+  }).join("");
+  panel.innerHTML = `<div class="module-wide cartas-realizadas-view">${html}</div>`;
+  state.imprimiendoTodas = true;
+  mostrarAvisoFlotante(`Preparando ${candidatas.length} carta(s) — se abrirá el diálogo de impresión, elige "Guardar como PDF".`, "ok");
+  setTimeout(() => window.print(), 150);
+}
+
+window.addEventListener("afterprint", () => {
+  if (state.imprimiendoTodas) {
+    state.imprimiendoTodas = false;
+    renderModules();
+  }
+});
 
 function mostrarQrCarta(cartaId) {
   const carta = state.cartas.find(c => String(c.id) === String(cartaId));
@@ -2634,8 +2796,57 @@ function mostrarQrCarta(cartaId) {
   setTimeout(() => {
     const canvas = container.querySelector("canvas");
     const link = document.getElementById("qr-download");
-    if (canvas && link) link.href = canvas.toDataURL("image/png");
+    if (canvas && link) link.href = qrConEtiquetaDataUrl(canvas, tag, nombre);
   }, 60);
+}
+
+function truncarTextoCanvas(ctx, texto, maxWidth) {
+  if (ctx.measureText(texto).width <= maxWidth) return texto;
+  let corto = texto;
+  while (corto.length > 1 && ctx.measureText(corto + "…").width > maxWidth) {
+    corto = corto.slice(0, -1);
+  }
+  return corto + "…";
+}
+
+function qrConEtiquetaDataUrl(qrCanvas, tag, nombre) {
+  const pad = 20;
+  const anchoMinimo = qrCanvas.width + pad * 2;
+  const anchoTexto = 320;
+  const out = document.createElement("canvas");
+  out.width = Math.max(anchoMinimo, anchoTexto + pad * 2);
+  out.height = qrCanvas.width + pad * 2 + 34 + (nombre ? 24 : 0);
+  const ctx = out.getContext("2d");
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, out.width, out.height);
+  ctx.drawImage(qrCanvas, (out.width - qrCanvas.width) / 2, pad);
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#07112e";
+  ctx.font = "bold 22px Arial";
+  ctx.fillText(truncarTextoCanvas(ctx, tag || "", out.width - pad * 2), out.width / 2, qrCanvas.width + pad + 26);
+  if (nombre) {
+    ctx.font = "15px Arial";
+    ctx.fillStyle = "#4a5170";
+    ctx.fillText(truncarTextoCanvas(ctx, nombre, out.width - pad * 2), out.width / 2, qrCanvas.width + pad + 48);
+  }
+  return out.toDataURL("image/png");
+}
+
+function verFotoDesdeCard(card) {
+  const img = card?.querySelector("img");
+  if (!img || !img.src) return;
+  const title = card.querySelector("strong")?.textContent || "";
+  verFotoAmpliada(img.src, title);
+}
+
+function verFotoAmpliada(src, title) {
+  if (!src) return;
+  abrirModal(`
+    <div class="foto-ampliada">
+      <img src="${escapeHtml(src)}" alt="${escapeHtml(title || "")}" referrerpolicy="no-referrer">
+      ${title ? `<strong>${escapeHtml(title)}</strong>` : ""}
+    </div>
+  `);
 }
 
 function copiarLigaQr(url) {
@@ -3935,12 +4146,15 @@ function renderModules() {
       const fotosReales = new Set((state.fotos || []).map(item => String(item.id)));
       const fotosHtml = fotos.length ? fotos.map(foto => {
         const src = fotoSrc(foto);
-        const title = foto.categoria || foto.tipo || foto.file_name || "Foto";
+        const tituloCrudo = String(foto.categoria || foto.tipo || foto.file_name || "Foto");
+        const title = esFotoEquipo(foto) || /^foto[\s_]?equipo$/i.test(tituloCrudo)
+          ? "Foto completa del equipo"
+          : tituloCrudo;
         const puedeEliminar = fotosReales.has(String(foto.id));
         const botonEliminar = puedeEliminar
           ? `<button class="photo-delete-button" type="button" title="Eliminar foto" aria-label="Eliminar foto" onclick="event.stopPropagation(); eliminarFotoLevantamiento('${escapeHtml(String(foto.id))}')">&times;</button>`
           : "";
-        return `<article class="photo-card">
+        return `<article class="photo-card"${src ? ` onclick="verFotoDesdeCard(this)"` : ""}>
           ${botonEliminar}
           ${src ? `<img src="${escapeHtml(src)}" alt="${escapeHtml(title)}" referrerpolicy="no-referrer">` : `<div class="photo-empty">Archivo en Storage</div>`}
           <strong>${escapeHtml(title)}</strong>
@@ -3971,7 +4185,7 @@ function renderModules() {
             <strong>Agregar foto de levantamiento</strong>
             <label>Tipo de foto
               <select id="levantamiento-categoria">
-                <option value="foto_equipo">Foto equipo</option>
+                <option value="foto_equipo">Foto completa del equipo</option>
                 <option value="placa">Placa</option>
                 <option value="punto_lubricacion">Punto de lubricación</option>
                 <option value="referencia">Referencia</option>
@@ -4377,126 +4591,7 @@ function renderModules() {
             </article>
           `;
         }).join("") : `<div class="empty-state">Aún no hay cartas guardadas para esta empresa.</div>`;
-        const elementosHtml = elementos.length ? elementos.map((el, index) => `
-          <tr>
-            <td class="legacy-point-photo">
-              <strong>${escapeHtml(firstValue(el, ["npunto", "orden"], index + 1))}</strong>
-              ${cartaPuntoFoto(el) ? `<img src="${escapeHtml(cartaPuntoFoto(el))}" alt="" referrerpolicy="no-referrer">` : ""}
-            </td>
-            <td>${escapeHtml(firstValue(el, ["elemento", "nombre", "componente"], "Elemento"))}</td>
-            <td>${escapeHtml(firstValue(el, ["descripcion", "desc", "detalle"], ""))}</td>
-            <td>${escapeHtml(firstValue(el, ["lubricante", "lub", "producto"], ""))}</td>
-            <td>${escapeHtml(firstValue(el, ["lub_inicial", "lubInicial", "lubricacion_inicial", "inicial"], ""))}</td>
-            <td>${escapeHtml(firstValue(el, ["relub", "re_lub", "relubricacion"], ""))}</td>
-            <td>${escapeHtml(elementoTipoCantidad(el))}</td>
-            <td>${escapeHtml(elementoBombaLitros(el))}</td>
-            <td>${escapeHtml(firstValue(el, ["frecuencia", "frec"], ""))}</td>
-            <td>${escapeHtml(firstValue(el, ["tarea", "actividad"], ""))}</td>
-            <td>${escapeHtml(firstValue(el, ["int_muestreo", "int", "intervalo_muestreo"], ""))}</td>
-            <td>${escapeHtml(firstValue(el, ["temp_real", "temp", "temperatura", "temperatura_real"], ""))}</td>
-          </tr>
-        `).join("") : `
-          <tr>
-            <td colspan="12" class="empty-table">Esta carta todavía no tiene puntos de lubricación registrados.</td>
-          </tr>
-        `;
-        const firmas = typeof carta?.firmas === "object" && carta?.firmas ? carta.firmas : {};
-        const firmaReviso = firstValue(firmas, ["reviso", "reviso_nombre"], "");
-        const firmaFecha = firstValue(firmas, ["fecha", "fecha_actualizacion"], cartaFecha(carta));
-        const firmaAutorizo = firstValue(firmas, ["autorizo", "autorizo_nombre"], "");
-        const recomendaciones = firstValue(carta, ["recomendaciones", "recomendacion", "observaciones"], "");
-        const operadorCarta = firstValue(activeUser(), ["nombre", "usuario"], "admin");
-        const panelCarta = carta ? `
-          <section class="legacy-carta-preview">
-            <div class="legacy-toolbar">
-              <div>
-                ${detailMode ? `<button class="back-action" onclick="volverListaCartas()">&#8592;</button>` : ""}
-                <strong>${escapeHtml(cartaTag(carta, equipo))}</strong>
-                <span>${escapeHtml(cartaNombre(carta, equipo))}</span>
-              </div>
-              <button class="secondary-action" onclick="imprimirCarta()">Imprimir / PDF</button>
-            </div>
-            <div class="legacy-card">
-              <header class="legacy-card-head">
-                <div class="legacy-brand"><img src="${escapeHtml(companyLogoUrl(activeEmpresa()) || "./assets/logo-covia.png")}" alt=""></div>
-                <div>
-                  <h3>CARTA DE LUBRICACIÓN</h3>
-                  <span>SISTEMA DE GESTIÓN DE LUBRICACIÓN INDUSTRIAL - MOLUB</span>
-                </div>
-                <div class="legacy-site-box">
-                  <strong>PLANTA:</strong><span>${escapeHtml(firstValue(carta, ["planta"], activeEmpresa()?.nombre || "Sin planta"))}</span>
-                  <strong>DIRECCIÓN:</strong><span>${escapeHtml(firstValue(carta, ["direccion"], firstValue(activeEmpresa(), ["direccion", "ubicacion"], "Lampazos de Naranjo, N.L.")))}</span>
-                  <strong>FECHA:</strong><span>${escapeHtml(cartaFecha(carta))}</span>
-                </div>
-              </header>
-              <section class="legacy-equipment">
-                <div class="legacy-photo">${cartaFoto(carta, equipo) ? `<img src="${escapeHtml(cartaFoto(carta, equipo))}" alt="" referrerpolicy="no-referrer">` : `<span>Foto equipo</span>`}</div>
-                <div class="legacy-meta-grid">
-                  <label>NOMBRE EQUIPO<strong>${escapeHtml(cartaNombre(carta, equipo))}</strong></label>
-                  <label>ID TAG<strong>${escapeHtml(cartaTag(carta, equipo))}</strong></label>
-                  <label>ÁREA<strong>${escapeHtml(cartaArea(carta, equipo))}</strong></label>
-                  <label>CRITICIDAD<strong>${escapeHtml(cartaCriticidad(carta, equipo))}</strong></label>
-                  <label>SISTEMA<strong>${escapeHtml(cartaSistema(carta, equipo))}</strong></label>
-                  <label>ELEMENTOS<strong>${escapeHtml(elementos.length)} puntos de lubricación</strong></label>
-                </div>
-              </section>
-              <div class="legacy-section-title">ELEMENTOS TRIBOLÓGICOS - PUNTOS DE LUBRICACIÓN</div>
-              <div class="legacy-table-wrap">
-                <table class="legacy-elements-table">
-                  <thead>
-                    <tr>
-                      <th>Foto punto</th>
-                      <th>Elemento</th>
-                      <th>Descripción</th>
-                      <th>Lubricante</th>
-                      <th>Lub. inicial</th>
-                      <th>Re-Lub.</th>
-                      <th>Tipo / Cant.</th>
-                      <th>Bomb. / Litros</th>
-                      <th>Frecuencia</th>
-                      <th>Tarea</th>
-                      <th>Int. muestreo</th>
-                      <th>Temp. real</th>
-                    </tr>
-                  </thead>
-                  <tbody>${elementosHtml}</tbody>
-                </table>
-              </div>
-              <section class="legacy-recommendations">
-                <h4>RECOMENDACIONES DE MONITOREO E INSPECCIÓN</h4>
-                <p>${escapeHtml(recomendaciones)}</p>
-              </section>
-              <section class="legacy-signatures">
-                <div>
-                  <span>REVISÓ</span>
-                  <strong>Departamento de Lubricación</strong>
-                  <i></i>
-                  <p><b>Nombre:</b> ${escapeHtml(firmaReviso)}</p>
-                </div>
-                <div>
-                  <span>FECHA DE ACTUALIZACIÓN</span>
-                  <strong>Control de versiones</strong>
-                  <i></i>
-                  <p><b>Fecha:</b> ${escapeHtml(firmaFecha)}</p>
-                </div>
-                <div>
-                  <span>AUTORIZÓ</span>
-                  <strong>Autorización</strong>
-                  <i></i>
-                  <p><b>Nombre:</b> ${escapeHtml(firmaAutorizo)}</p>
-                </div>
-              </section>
-              <footer class="legacy-footer-bar">
-                <span>COVIA LAMPAZOS - MOLUB - Generada el ${escapeHtml(cartaFecha(carta))}</span>
-                <span>Operador: ${escapeHtml(operadorCarta)}</span>
-              </footer>
-            </div>
-          </section>
-        ` : `
-          <section>
-            <div class="empty-state">Selecciona una carta para ver el detalle.</div>
-          </section>
-        `;
+        const panelCarta = construirPanelCarta(carta, equipo, elementos, detailMode);
         if (detailMode && state.vistaQr) {
           view.querySelector(".module-panel").innerHTML = `
             <div class="qr-print-view">
@@ -4530,11 +4625,14 @@ function renderModules() {
         } else {
           view.querySelector(".module-panel").innerHTML = `
             <div class="module-wide cartas-realizadas-view">
-              <div class="legacy-page-hero">
+              <div class="legacy-page-hero cartas-list-hero">
                 <div>
                   <p class="eyebrow">Cartas realizadas</p>
                   <h2>Cartas realizadas</h2>
                   <p>Cartas de lubricación guardadas para esta empresa.</p>
+                </div>
+                <div class="hero-actions">
+                  <button class="secondary-action qr-action" onclick="descargarTodasLasCartas()">Descargar todas (PDF)</button>
                 </div>
               </div>
               <div class="filter-row">
