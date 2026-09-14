@@ -2733,6 +2733,19 @@ function cartasGuardadasDeEmpresa() {
   return (state.cartas || []).filter(carta => cartaStatus(carta, cartaEquipo(carta)) === "Guardada");
 }
 
+function esperarImagenesCargadas(container, timeoutMs = 20000) {
+  const imgs = Array.from(container.querySelectorAll("img"));
+  return Promise.all(imgs.map(img => {
+    if (img.complete) return Promise.resolve();
+    return new Promise(resolve => {
+      const listo = () => { img.removeEventListener("load", listo); img.removeEventListener("error", listo); resolve(); };
+      img.addEventListener("load", listo, { once: true });
+      img.addEventListener("error", listo, { once: true });
+      setTimeout(listo, timeoutMs);
+    });
+  }));
+}
+
 async function descargarTodasLasCartas() {
   const candidatas = cartasGuardadasDeEmpresa();
   if (!candidatas.length) {
@@ -2760,9 +2773,16 @@ async function descargarTodasLasCartas() {
     return `<div class="legacy-carta-preview legacy-carta-page">${legacyCardBodyHtml(carta, equipo, elementos)}</div>`;
   }).join("");
   panel.innerHTML = `<div class="module-wide cartas-realizadas-view">${html}</div>`;
+  // Los datos de las fotos ya estan listos, pero cada <img> todavia
+  // tiene que descargarse/pintarse en pantalla (muchas son fotos
+  // migradas con liga firmada, no vienen incrustadas). Si se manda
+  // a imprimir antes de que terminen de cargar, salen en blanco -
+  // por eso se espera a que carguen todas antes de abrir el dialogo.
+  mostrarAvisoFlotante(`Cargando las fotos en pantalla (puede tardar unos segundos con ${candidatas.length} cartas)...`, "ok");
+  await esperarImagenesCargadas(panel);
   state.imprimiendoTodas = true;
   document.getElementById("aviso-flotante")?.classList.remove("show");
-  setTimeout(() => window.print(), 150);
+  window.print();
 }
 
 window.addEventListener("afterprint", () => {
