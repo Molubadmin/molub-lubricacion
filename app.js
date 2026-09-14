@@ -2744,8 +2744,16 @@ async function descargarTodasLasCartas() {
   mostrarAvisoFlotante(`Preparando ${candidatas.length} carta(s), cargando fotos de los puntos...`, "ok");
   // Las fotos de los puntos no se traen en la carga normal de la
   // lista (para no descargar de mas - ver ELEMENTOS_CARTA_SELECT_LISTA).
-  // Aqui si las necesitamos todas antes de armar el PDF, una por una.
-  await Promise.all(candidatas.map(carta => cargarFotosDeElementosCarta(carta.id, carta.equipo_id)));
+  // Hay dos fuentes posibles: el propio punto en elementos_lubricacion
+  // (cargarFotosDeElementosCarta) y las fotos de "Ingresar a planta"
+  // categoria "Punto de lubricacion" que se acomodan por equipo
+  // (cargarFotosDeEquipoConUrl). Una carta real puede depender de
+  // cualquiera de las dos, asi que se piden ambas antes de armar el PDF.
+  const equiposUnicos = [...new Set(candidatas.map(c => c.equipo_id).filter(Boolean))];
+  await Promise.all([
+    ...candidatas.map(carta => cargarFotosDeElementosCarta(carta.id, carta.equipo_id)),
+    ...equiposUnicos.map(equipoId => cargarFotosDeEquipoConUrl(equipoId))
+  ]);
   const html = candidatas.map(carta => {
     const equipo = cartaEquipo(carta);
     const elementos = elementosForCarta(carta, equipo);

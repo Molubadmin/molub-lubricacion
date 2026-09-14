@@ -8,7 +8,7 @@ body.gate-activo .sidebar,body.gate-activo .mobile-menu-toggle,body.gate-activo 
 .acceso-gate-hero-rule{width:48px;height:4px;background:var(--blue);border-radius:2px}
 .acceso-gate-hero-tagline{margin:0;color:var(--ink);font-weight:800;text-transform:uppercase;letter-spacing:.8px;font-size:14px;line-height:1.65}
 .acceso-gate-box{width:100%;text-align:left}
-.acceso-gate-eyebrow{font-size:30px;font-weight:900;letter-spacing:.2px;line-height:1.2;margin-bottom:10px}
+.eyebrow.acceso-gate-eyebrow{font-size:30px;font-weight:900;letter-spacing:.2px;line-height:1.2;margin-bottom:10px}
 .acceso-gate-box h1{font-size:19px;font-weight:700;margin:2px 0 22px;color:var(--muted)}
 .acceso-gate-section{text-align:left;margin-bottom:8px}
 .acceso-gate-row{display:grid;gap:10px;margin-bottom:12px}
