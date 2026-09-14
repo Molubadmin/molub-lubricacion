@@ -3847,6 +3847,22 @@ function volverAEquipos() {
   render();
 }
 
+function irACartaDeEquipo(equipoId) {
+  if (!moduleEnabled("cartas")) {
+    mostrarAvisoFlotante("El módulo de Cartas realizadas está apagado para esta empresa.", "error");
+    return;
+  }
+  // Limpiamos busqueda/filtro de cartas para que la carta de este
+  // equipo no quede escondida por un filtro que se haya quedado de
+  // antes, y para que siempre abra la de ESTE equipo.
+  state.cartaSearch = "";
+  state.cartaAreaFiltro = "";
+  const cartaReal = cartaForEquipo(equipoId);
+  const cartaId = cartaReal ? cartaReal.id : `auto-${equipoId}`;
+  setView("cartas");
+  seleccionarCarta(cartaId);
+}
+
 function renderModules() {
   $("module-settings").innerHTML = MODULES.map(m => `
     <div class="module-toggle ${moduleEnabled(m.id) ? "enabled" : ""}" onclick="toggleModule('${m.id}')">
@@ -3905,7 +3921,10 @@ function renderModules() {
         `;
         view.querySelector(".module-panel").innerHTML = equipo ? `
           <div>
-            <button type="button" class="back-action" title="Regresar a Ingresar a planta" onclick="volverAEquipos()">&#8592;</button>
+            <div class="lift-toolbar">
+              <button type="button" class="back-action" title="Regresar a Ingresar a planta" onclick="volverAEquipos()">&#8592;</button>
+              ${fotos.length ? `<button type="button" class="ver-carta-action" onclick="irACartaDeEquipo('${escapeHtml(equipo.id)}')">Ver carta de lubricación →</button>` : ""}
+            </div>
             <p class="eyebrow">Levantamiento del equipo</p>
             <h2>${escapeHtml(equipo.id_tag || "SIN TAG")}</h2>
             <p><strong>${escapeHtml(equipo.nombre_equipo || "Sin nombre")}</strong></p>
