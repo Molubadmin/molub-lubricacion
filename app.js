@@ -2733,7 +2733,7 @@ function cartasGuardadasDeEmpresa() {
   return (state.cartas || []).filter(carta => cartaStatus(carta, cartaEquipo(carta)) === "Guardada");
 }
 
-function descargarTodasLasCartas() {
+async function descargarTodasLasCartas() {
   const candidatas = cartasGuardadasDeEmpresa();
   if (!candidatas.length) {
     mostrarAvisoFlotante("Aún no hay cartas guardadas con información capturada para descargar.", "warn");
@@ -2741,6 +2741,11 @@ function descargarTodasLasCartas() {
   }
   const panel = document.querySelector("#cartas .module-panel");
   if (!panel) return;
+  mostrarAvisoFlotante(`Preparando ${candidatas.length} carta(s), cargando fotos de los puntos...`, "ok");
+  // Las fotos de los puntos no se traen en la carga normal de la
+  // lista (para no descargar de mas - ver ELEMENTOS_CARTA_SELECT_LISTA).
+  // Aqui si las necesitamos todas antes de armar el PDF, una por una.
+  await Promise.all(candidatas.map(carta => cargarFotosDeElementosCarta(carta.id, carta.equipo_id)));
   const html = candidatas.map(carta => {
     const equipo = cartaEquipo(carta);
     const elementos = elementosForCarta(carta, equipo);
@@ -2748,7 +2753,7 @@ function descargarTodasLasCartas() {
   }).join("");
   panel.innerHTML = `<div class="module-wide cartas-realizadas-view">${html}</div>`;
   state.imprimiendoTodas = true;
-  mostrarAvisoFlotante(`Preparando ${candidatas.length} carta(s) — se abrirá el diálogo de impresión, elige "Guardar como PDF".`, "ok");
+  document.getElementById("aviso-flotante")?.classList.remove("show");
   setTimeout(() => window.print(), 150);
 }
 
