@@ -4796,6 +4796,16 @@ $("gate-password")?.addEventListener("keydown", (event) => {
 
 
 sb.auth.onAuthStateChange((_event, session) => {
+  if (state.vistaQr || /[?&]carta=/.test(location.search)) {
+    // La vista de un QR maneja sus propios datos con
+    // obtener_carta_publica y no necesita (ni debe) sesion. Supabase
+    // dispara este evento tambien para visitantes anonimos poco
+    // despues de cargar la pagina; si se le hacia caso aqui, disparaba
+    // una recarga completa que fallaba por RLS (sin sesion) y borraba
+    // la carta que el QR ya habia mostrado - por eso se veia lento y
+    // terminaba sin la carta.
+    return;
+  }
   applyAuthSession(session, !bootstrapping).catch(err => {
     console.warn("No se pudo sincronizar sesion:", err.message);
   });
