@@ -783,6 +783,23 @@ async function loadEquiposInterno() {
   if (!state.equipos.some(e => e.id === state.selectedEquipoId)) {
     state.selectedEquipoId = state.equipos[0]?.id || "";
   }
+  // Los renglones de arriba acaban de reemplazar fotosEmpresa y
+  // elementosCartas por su version liviana (sin foto). Si en este
+  // momento hay una carta abierta en pantalla, sus fotos completas
+  // se acaban de perder aunque nadie haya tocado nada - por ejemplo,
+  // si esta recarga la disparo otra pestaña, un guardado en otra
+  // parte de la app, o el refresco automatico de la sesion. Se
+  // vuelven a pedir aqui para que la pantalla no se quede rota.
+  if (state.cartaDetailMode && state.selectedCartaId) {
+    const cartaAbierta = selectedCarta();
+    const equipoAbierto = cartaEquipo(cartaAbierta);
+    if (cartaAbierta && equipoAbierto) {
+      await Promise.all([
+        cargarFotosDeEquipoConUrl(equipoAbierto.id),
+        cargarFotosDeElementosCarta(cartaAbierta.id, equipoAbierto.id)
+      ]);
+    }
+  }
   clearStatus();
   render();
 }
@@ -1890,14 +1907,19 @@ async function cargarFotosDeElementosCarta(cartaId, equipoId) {
   if (yaCompletos) return;
   const { data, error } = await sb
     .from(cfg.tables.elementosCartas)
-    .select("id,foto_url")
+    .select("id,foto_url,foto_storage_path")
     .eq("empresa_id", state.empresaId)
     .or(filtros.join(","));
   if (error) {
     console.warn("No se pudieron cargar las fotos de los puntos de esta carta:", error.message);
     return;
   }
-  const porId = new Map((data || []).map(row => [String(row.id), row]));
+  // Las fotos viejas (migradas) viven en Storage con una liga firmada
+  // que vence cada semana; withSignedFotoUrl la vuelve a generar
+  // fresca cada vez que se pide. Sin esto, esas fotos se ven rotas
+  // aunque el dato exista en la base.
+  const filasFirmadas = await Promise.all((data || []).map(withSignedFotoUrl));
+  const porId = new Map(filasFirmadas.map(row => [String(row.id), row]));
   state.elementosCartas = (state.elementosCartas || []).map(el =>
     porId.has(String(el.id)) ? { ...el, ...porId.get(String(el.id)), __fotoCargada: true } : el
   );
@@ -4609,8 +4631,14 @@ async function abrirCartaDesdeLiga(cartaId) {
   state.empresas = [{ id: state.empresaId, nombre: data.empresa_nombre || "", direccion: data.empresa_direccion || "" }];
   state.equipos = data.equipo ? [data.equipo] : [];
   state.cartas = [carta];
-  state.elementosCartas = (data.elementos || []).map(el => ({ ...el, __fotoCargada: true }));
-  state.fotosEmpresa = (data.fotos || []).map(f => ({ ...f, __urlCargada: true }));
+  // Las fotos migradas viejas viven en Storage con una liga firmada
+  // que vence cada semana - withSignedFotoUrl la regenera fresca.
+  const [elementosFirmados, fotosFirmadas] = await Promise.all([
+    Promise.all((data.elementos || []).map(withSignedFotoUrl)),
+    Promise.all((data.fotos || []).map(withSignedFotoUrl))
+  ]);
+  state.elementosCartas = elementosFirmados.map(el => ({ ...el, __fotoCargada: true }));
+  state.fotosEmpresa = fotosFirmadas.map(f => ({ ...f, __urlCargada: true }));
   state.fotoCounts = {};
   state.fotosEmpresa.forEach(f => {
     if (f.equipo_id) state.fotoCounts[f.equipo_id] = (state.fotoCounts[f.equipo_id] || 0) + 1;
