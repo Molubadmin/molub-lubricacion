@@ -2871,6 +2871,10 @@ async function guardarCartaCompleta() {
   state.selectedCartaId = cartaId;
   await loadCartas();
   await loadElementosCartas();
+  // loadElementosCartas trae la lista liviana (sin foto_url); sin
+  // esto, la foto de cada punto que se acaba de guardar desaparecia
+  // de la pantalla hasta volver a entrar a la carta.
+  await cargarFotosDeElementosCarta(cartaId, equipo.id);
   renderModules();
   setStatusVisible("Carta de lubricación guardada.");
   mostrarAvisoFlotante("Carta de lubricación guardada.", "ok");
@@ -3593,9 +3597,13 @@ async function guardarFotoLevantamiento() {
     await loadLevantamientoForSelectedEquipo();
     renderEquipos();
     setStatus("Foto de levantamiento guardada.", "");
-    if (!cartaForEquipo(equipo.id)) {
-      mostrarAvisoFlotante(`Levantamiento guardado. La carta de ${equipo.id_tag || equipo.nombre_equipo} sigue Pendiente hasta que la llenes y le des "Guardar carta".`, "ok");
-    }
+    const etiquetaEquipo = equipo.id_tag || equipo.nombre_equipo;
+    mostrarAvisoFlotante(
+      cartaForEquipo(equipo.id)
+        ? `Foto de levantamiento guardada correctamente (${escapeHtml(etiquetaEquipo)}).`
+        : `Foto de levantamiento guardada. La carta de ${escapeHtml(etiquetaEquipo)} sigue Pendiente hasta que la llenes y le des "Guardar carta".`,
+      "ok"
+    );
   } catch (err) {
     console.warn("No se pudo guardar foto:", err.message);
     setStatus(`No se pudo guardar foto: ${err.message}`, "error");
@@ -4569,31 +4577,43 @@ function ocultarPantallaCargaQr() {
 
 async function abrirCartaDesdeLiga(cartaId) {
   setStatus("Cargando carta desde el código QR...");
-  const { data: cartaRow, error } = await sb
-    .from(cfg.tables.cartas)
-    .select("empresa_id")
-    .eq("id", cartaId)
-    .maybeSingle();
+  // Esto usa una funcion especial en Supabase (obtener_carta_publica,
+  // Paso 42) que funciona SIN iniciar sesion: entrega solo la carta
+  // de este id exacto (el que trae el QR), su equipo, sus puntos y
+  // sus fotos - nada mas de la empresa. Es lo que permite que
+  // cualquiera escanee el QR fisico sin usuario ni contraseña, sin
+  // reabrir el acceso a todo lo demas.
+  const { data, error } = await sb.rpc("obtener_carta_publica", { p_carta_id: cartaId });
 
-  if (error || !cartaRow) {
+  if (error || !data || !data.carta) {
     setStatus("No se encontró la carta de esa liga o código QR. Puede que haya sido eliminada.", "error");
-    await loadEmpresas();
-    $("empresa-select").value = state.empresaId;
-    syncAuthLockedControls();
-    await loadEquipos();
     ocultarPantallaCargaQr();
+    if (!state.authUser) mostrarGateAcceso();
     return;
   }
 
-  state.empresaId = cartaRow.empresa_id;
-  await loadEmpresas();
-  $("empresa-select").value = state.empresaId;
-  syncAuthLockedControls();
-  await loadEquipos();
+  const carta = data.carta;
+  state.empresaId = carta.empresa_id || state.empresaId || "";
+  if ($("empresa-select")) {
+    $("empresa-select").innerHTML = `<option value="${escapeHtml(state.empresaId)}">${escapeHtml(data.empresa_nombre || "")}</option>`;
+    $("empresa-select").value = state.empresaId;
+  }
+  state.empresas = [{ id: state.empresaId, nombre: data.empresa_nombre || "", direccion: data.empresa_direccion || "" }];
+  state.equipos = data.equipo ? [data.equipo] : [];
+  state.cartas = [carta];
+  state.elementosCartas = (data.elementos || []).map(el => ({ ...el, __fotoCargada: true }));
+  state.fotosEmpresa = (data.fotos || []).map(f => ({ ...f, __urlCargada: true }));
+  state.fotoCounts = {};
+  state.fotosEmpresa.forEach(f => {
+    if (f.equipo_id) state.fotoCounts[f.equipo_id] = (state.fotoCounts[f.equipo_id] || 0) + 1;
+  });
+
   state.selectedCartaId = cartaId;
   state.cartaDetailMode = true;
   state.vistaQr = true;
   document.body.classList.add("vista-qr");
+  document.body.classList.remove("gate-activo");
+  $("acceso-gate")?.classList.add("hidden");
   setView("cartas");
   render();
   clearStatus();
