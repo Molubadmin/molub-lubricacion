@@ -4588,7 +4588,15 @@ async function abrirCartaDesdeLiga(cartaId) {
   if (error || !data || !data.carta) {
     setStatus("No se encontró la carta de esa liga o código QR. Puede que haya sido eliminada.", "error");
     ocultarPantallaCargaQr();
-    if (!state.authUser) mostrarGateAcceso();
+    if (state.authUser) {
+      // Ya tiene sesion iniciada (por ejemplo, la esta probando desde
+      // su propia cuenta): no la dejamos varada sin datos, la
+      // regresamos a su empresa de siempre con todo cargado normal.
+      await loadEmpresas();
+      await loadEquipos();
+    } else {
+      mostrarGateAcceso();
+    }
     return;
   }
 
