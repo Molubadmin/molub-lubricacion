@@ -4628,7 +4628,7 @@ async function abrirCartaDesdeLiga(cartaId) {
     $("empresa-select").innerHTML = `<option value="${escapeHtml(state.empresaId)}">${escapeHtml(data.empresa_nombre || "")}</option>`;
     $("empresa-select").value = state.empresaId;
   }
-  state.empresas = [{ id: state.empresaId, nombre: data.empresa_nombre || "", direccion: data.empresa_direccion || "" }];
+  state.empresas = [{ id: state.empresaId, nombre: data.empresa_nombre || "", direccion: carta.direccion || "" }];
   state.equipos = data.equipo ? [data.equipo] : [];
   state.cartas = [carta];
   // Las fotos migradas viejas viven en Storage con una liga firmada
