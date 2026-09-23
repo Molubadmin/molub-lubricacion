@@ -2086,7 +2086,49 @@ function renderPanelCierre() {
     `}`;
 }
 
-function fileToDataUrl(file) {
+// Las fotos se guardan como texto (base64) dentro de la base de datos,
+// asi que cada vez que alguien las abre viajan completas por internet
+// (egress). Una foto de celular pesa 3-6 MB; para una carta con 1600 px
+// de ancho se ve igual y pesa ~10 veces menos. Solo se reduce si de
+// verdad ayuda: PDFs, otros formatos o fotos ya chicas pasan tal cual, y
+// si algo falla al comprimir se usa el archivo original.
+const FOTO_MAX_LADO = 1600;
+const FOTO_CALIDAD_JPEG = 0.8;
+const FOTO_UMBRAL_BYTES = 250 * 1024;
+
+async function comprimirImagenSiConviene(file) {
+  try {
+    if (!file || !/^image\/(jpeg|png)$/.test(file.type) || file.size < FOTO_UMBRAL_BYTES) return file;
+    let bitmap;
+    if (window.createImageBitmap) {
+      bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+    } else {
+      bitmap = await new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = URL.createObjectURL(file);
+      });
+    }
+    const ancho = bitmap.width;
+    const alto = bitmap.height;
+    const escala = Math.min(1, FOTO_MAX_LADO / Math.max(ancho, alto));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(ancho * escala));
+    canvas.height = Math.max(1, Math.round(alto * escala));
+    canvas.getContext("2d").drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    if (bitmap.close) bitmap.close();
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, file.type, FOTO_CALIDAD_JPEG));
+    if (!blob || blob.type !== file.type || blob.size >= file.size * 0.9) return file;
+    return new File([blob], file.name, { type: file.type, lastModified: file.lastModified });
+  } catch (err) {
+    console.warn("No se pudo comprimir la imagen, se usa la original:", err);
+    return file;
+  }
+}
+
+async function fileToDataUrl(original) {
+  const file = await comprimirImagenSiConviene(original);
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result);
@@ -3801,15 +3843,6 @@ async function loadLevantamientoForSelectedEquipo() {
     state.levantamientoLoading = false;
     renderModules();
   }
-}
-
-function fileToDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
 }
 
 async function guardarFotoLevantamiento() {
