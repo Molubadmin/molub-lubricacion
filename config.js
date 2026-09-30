@@ -15,6 +15,7 @@ window.MOLUB_CONFIG = {
     lubricantes: "lubricantes",
     lubricanteEquipos: "lubricante_equipos",
     lubricantePresentaciones: "lubricante_presentaciones",
+    lubricanteMovimientos: "lubricante_movimientos",
     raciMatriz: "raci_matriz"
   }
 };

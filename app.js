@@ -13,6 +13,8 @@ const state = {
   lubricantes: [],
   lubricanteEquipos: [],
   lubricantePresentaciones: [],
+  lubricanteMovimientos: [],
+  lubricanteMovimientoFormAbierto: false,
   selectedLubricanteId: "",
   lubricanteDetailMode: false,
   lubricanteTab: "equipos",
@@ -776,6 +778,7 @@ async function loadEquiposInterno() {
     loadLubricantes(),
     loadLubricanteEquipos(),
     loadLubricantePresentaciones(),
+    loadLubricanteMovimientos(),
     loadPerfiles(),
     loadRaciMatriz()
   ]);
@@ -1068,6 +1071,28 @@ async function loadLubricantePresentaciones() {
     return;
   }
   state.lubricantePresentaciones = data || [];
+}
+
+async function loadLubricanteMovimientos() {
+  state.lubricanteMovimientos = [];
+  if (!cfg.tables.lubricanteMovimientos || !state.empresaId) return;
+  const { data, error } = await sb
+    .from(cfg.tables.lubricanteMovimientos)
+    .select("id,lubricante_id,presentacion_id,tipo,oc,cantidad,fecha_suministro,nota,usuario,created_at")
+    .eq("empresa_id", state.empresaId)
+    .order("fecha_suministro", { ascending: false })
+    .order("created_at", { ascending: false });
+  if (error) {
+    // La tabla es nueva (Paso 44); si aun no se corre el SQL, no
+    // truena el resto de la app - el historial solo sale vacio.
+    console.warn("No se pudieron cargar movimientos de lubricantes:", error.message);
+    return;
+  }
+  state.lubricanteMovimientos = data || [];
+}
+
+function movimientosDe(lubricanteId) {
+  return state.lubricanteMovimientos.filter(m => String(m.lubricante_id) === String(lubricanteId));
 }
 
 function equiposAsociadosDe(lubricanteId) {
@@ -1442,6 +1467,7 @@ async function seleccionarLubricante(id) {
   state.lubricanteTab = "equipos";
   state.lubricanteAsociarFormAbierto = false;
   state.lubricantePresentacionFormAbierto = false;
+  state.lubricanteMovimientoFormAbierto = false;
   state.lubricanteAliasPickerAbierto = false;
   renderModules();
   await cargarDocumentacionLubricante(id);
@@ -1458,6 +1484,7 @@ function cambiarTabLubricante(tab) {
   state.lubricanteTab = tab;
   state.lubricanteAsociarFormAbierto = false;
   state.lubricantePresentacionFormAbierto = false;
+  state.lubricanteMovimientoFormAbierto = false;
   state.lubricanteAliasPickerAbierto = false;
   renderModules();
 }
@@ -1793,8 +1820,150 @@ async function subirDocumentoLubricante(lubricanteId, prefix, input) {
   mostrarAvisoFlotante("Documento actualizado.", "ok");
 }
 
-function renderTabConsumos() {
-  return `<div class="empty-state small">Todavía no llevamos un registro de consumos por movimiento. Cuando definamos cómo capturar cada aplicación (técnico, fecha y cantidad), el historial se mostrará aquí.</div>`;
+function nombrePresentacionPorId(presentacionId) {
+  const p = state.lubricantePresentaciones.find(item => String(item.id) === String(presentacionId));
+  return p ? presentacionTexto(p) : "Presentación eliminada";
+}
+
+function renderTabConsumos(l, presentaciones) {
+  const movimientos = movimientosDe(l.id);
+  const supervisor = isSupervisorMode();
+  const filas = movimientos.length ? movimientos.map(m => `
+    <tr>
+      <td>${escapeHtml(m.fecha_suministro || "Sin fecha")}</td>
+      <td>${escapeHtml(m.oc || "Sin OC")}</td>
+      <td>${escapeHtml(nombrePresentacionPorId(m.presentacion_id))}</td>
+      <td>${escapeHtml(m.cantidad)}</td>
+      <td>${escapeHtml(m.usuario || "")}</td>
+      ${supervisor ? `<td><button class="icon-danger-button" type="button" title="Eliminar" onclick="eliminarMovimientoLubricante('${escapeHtml(m.id)}')">&times;</button></td>` : ""}
+    </tr>
+  `).join("") : `
+    <tr><td colspan="${supervisor ? 6 : 5}" class="empty-table">Todavía no hay entradas registradas para este lubricante.</td></tr>
+  `;
+
+  const formAbierto = state.lubricanteMovimientoFormAbierto;
+  const opcionesPresentacion = presentaciones.map(p =>
+    `<option value="${escapeHtml(p.id)}">${escapeHtml(presentacionTexto(p))}</option>`
+  ).join("");
+
+  return `
+    <div class="lube-uso-table-wrap">
+      <table class="lube-uso-table">
+        <thead><tr><th>Fecha de suministro</th><th>OC</th><th>Presentación</th><th>Cantidad</th><th>Registró</th>${supervisor ? "<th></th>" : ""}</tr></thead>
+        <tbody>${filas}</tbody>
+      </table>
+    </div>
+    ${supervisor ? `
+      ${!presentaciones.length ? `<div class="empty-state small">Registra primero una presentación (pestaña "Presentaciones") para poder capturar entradas.</div>` : `
+        ${formAbierto ? `
+          <section class="lube-form-panel">
+            <h3>Registrar entrada de OC</h3>
+            <div class="form-preview">
+              <div class="two-cols">
+                <label>Número de OC<input id="mov-oc" placeholder="Ej: OC-2026-118"></label>
+                <label>Fecha de suministro<input id="mov-fecha" type="date" value="${new Date().toISOString().slice(0, 10)}"></label>
+              </div>
+              <div class="two-cols">
+                <label>Presentación<select id="mov-presentacion">${opcionesPresentacion}</select></label>
+                <label>Número de envases<input id="mov-cantidad" type="number" min="0" step="any" placeholder="Ej: 4"></label>
+              </div>
+              <label>Nota (opcional)<input id="mov-nota" placeholder="Ej: entregó el proveedor tal..."></label>
+              <div class="form-action">
+                <button class="ghost-action" onclick="toggleMovimientoForm()">Cancelar</button>
+                <button onclick="guardarMovimientoLubricante('${escapeHtml(l.id)}')">Guardar entrada</button>
+              </div>
+            </div>
+          </section>
+        ` : `<button onclick="toggleMovimientoForm()">+ Registrar entrada (OC)</button>`}
+      `}
+    ` : ""}
+  `;
+}
+
+function toggleMovimientoForm() {
+  if (!isSupervisorMode()) return;
+  state.lubricanteMovimientoFormAbierto = !state.lubricanteMovimientoFormAbierto;
+  renderModules();
+}
+
+async function guardarMovimientoLubricante(lubricanteId) {
+  if (!isSupervisorMode()) return;
+  const oc = $("mov-oc")?.value.trim();
+  const fecha = $("mov-fecha")?.value || null;
+  const presentacionId = $("mov-presentacion")?.value;
+  const cantidad = Number($("mov-cantidad")?.value);
+  const nota = $("mov-nota")?.value.trim() || null;
+
+  if (!presentacionId) {
+    mostrarAvisoFlotante("Selecciona a qué presentación corresponde esta entrada.", "error");
+    return;
+  }
+  if (!cantidad || cantidad <= 0) {
+    mostrarAvisoFlotante("Escribe cuántos envases entraron (mayor a 0).", "error");
+    return;
+  }
+
+  const presentacion = state.lubricantePresentaciones.find(p => String(p.id) === String(presentacionId));
+  if (!presentacion) {
+    mostrarAvisoFlotante("Esa presentación ya no existe, recarga la página.", "error");
+    return;
+  }
+
+  const { error: movError } = await sb.from(cfg.tables.lubricanteMovimientos).insert({
+    empresa_id: state.empresaId,
+    lubricante_id: lubricanteId,
+    presentacion_id: presentacionId,
+    tipo: "entrada",
+    oc: oc || null,
+    cantidad,
+    fecha_suministro: fecha,
+    nota,
+    usuario: firstValue(activeUser(), ["nombre", "usuario"], "")
+  });
+  if (movError) {
+    mostrarAvisoFlotante(`No se pudo guardar la entrada: ${movError.message}. Corre el Paso 44 si aún no lo has corrido.`, "error");
+    return;
+  }
+
+  // La entrada de OC suma directo al inventario de esa presentacion,
+  // para no tener dos numeros (historial vs inventario) que se
+  // puedan desincronizar - el inventario siempre refleja lo recibido.
+  const nuevoTotal = (Number(presentacion.num_envases) || 0) + cantidad;
+  const { error: invError } = await sb
+    .from(cfg.tables.lubricantePresentaciones)
+    .update({ num_envases: nuevoTotal })
+    .eq("id", presentacionId);
+  if (invError) {
+    mostrarAvisoFlotante(`La entrada se guardó, pero no se pudo actualizar el inventario: ${invError.message}`, "error");
+  }
+
+  state.lubricanteMovimientoFormAbierto = false;
+  await Promise.all([loadLubricanteMovimientos(), loadLubricantePresentaciones()]);
+  renderModules();
+  mostrarAvisoFlotante("Entrada registrada e inventario actualizado.", "ok");
+}
+
+async function eliminarMovimientoLubricante(id) {
+  if (!isSupervisorMode()) return;
+  const mov = state.lubricanteMovimientos.find(m => String(m.id) === String(id));
+  if (!mov) return;
+  if (!window.confirm("¿Eliminar esta entrada? También se restará del inventario de la presentación.")) return;
+
+  const { error } = await sb.from(cfg.tables.lubricanteMovimientos).delete().eq("id", id);
+  if (error) {
+    mostrarAvisoFlotante(`No se pudo eliminar: ${error.message}`, "error");
+    return;
+  }
+
+  const presentacion = state.lubricantePresentaciones.find(p => String(p.id) === String(mov.presentacion_id));
+  if (presentacion) {
+    const nuevoTotal = Math.max(0, (Number(presentacion.num_envases) || 0) - Number(mov.cantidad || 0));
+    await sb.from(cfg.tables.lubricantePresentaciones).update({ num_envases: nuevoTotal }).eq("id", presentacion.id);
+  }
+
+  await Promise.all([loadLubricanteMovimientos(), loadLubricantePresentaciones()]);
+  renderModules();
+  mostrarAvisoFlotante("Entrada eliminada.", "ok");
 }
 
 function renderDetalleLubricante() {
@@ -1847,7 +2016,7 @@ function renderDetalleLubricante() {
       ${tab === "presentaciones" ? renderTabPresentaciones(l, presentaciones) : ""}
       ${tab === "inventario" ? renderTabInventario(presentaciones) : ""}
       ${tab === "documentacion" ? renderTabDocumentacion(l) : ""}
-      ${tab === "consumos" ? renderTabConsumos() : ""}
+      ${tab === "consumos" ? renderTabConsumos(l, presentaciones) : ""}
     </div>`;
 }
 
@@ -4872,6 +5041,7 @@ function resetearVistasDeDetalle() {
   state.editandoLubricanteId = "";
   state.lubricanteAsociarFormAbierto = false;
   state.lubricantePresentacionFormAbierto = false;
+  state.lubricanteMovimientoFormAbierto = false;
   state.lubricanteAliasPickerAbierto = false;
   state.cartaDetailMode = false;
   state.selectedCartaId = "";
