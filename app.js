@@ -1196,7 +1196,7 @@ function renderModules() {
             : "Sin levantamiento";
       const fotos = fotosLevantamientoParaEquipo(equipo);
       const fotosReales = new Set((state.fotos || []).map(item => String(item.id)));
-      const fotosHtml = fotos.length ? fotos.map((foto, idx) => {
+      const fotosHtml = fotos.map((foto, idx) => {
         const src = fotoSrc(foto);
         const tituloCrudo = String(foto.categoria || foto.tipo || foto.file_name || "Foto");
         const title = esFotoEquipo(foto) || /^foto[\s_]?equipo$/i.test(tituloCrudo)
@@ -1211,21 +1211,33 @@ function renderModules() {
             <button type="button" title="Subir" aria-label="Subir" ${idx === 0 ? "disabled" : ""} onclick="event.stopPropagation(); moverPuntoLevantamiento('${escapeHtml(String(foto.id))}','subir')">&uarr;</button>
             <button type="button" title="Bajar" aria-label="Bajar" ${idx === fotos.length - 1 ? "disabled" : ""} onclick="event.stopPropagation(); moverPuntoLevantamiento('${escapeHtml(String(foto.id))}','bajar')">&darr;</button>
           </div>` : "";
+        const baseDelNombre = nombreBaseDePunto(title);
+        const permiteDuplicar = puedeEliminar && baseDelNombre.toLowerCase() !== "foto completa del equipo";
+        const botonDuplicar = permiteDuplicar
+          ? `<button type="button" class="point-dup-link" onclick="event.stopPropagation(); abrirModalPuntoLevantamiento(nombrePuntoSinDuplicar('${escapeHtml(baseDelNombre)}','${escapeHtml(equipo.id)}'))">+ agregar otra</button>`
+          : "";
         return `<article class="photo-card"${src ? ` onclick="verFotoDesdeCard(this)"` : ""}>
           ${botonEliminar}
           ${botonesOrden}
           ${src ? `<img src="${escapeHtml(src)}" alt="${escapeHtml(title)}" referrerpolicy="no-referrer">` : `<div class="photo-empty">Archivo en Storage</div>`}
           <strong>${escapeHtml(title)}</strong>
           <span>${esSoloReferencia ? "Solo referencia - no sale en la carta" : (foto.file_name || foto.storage_path || "Sin nombre de archivo")}</span>
+          ${botonDuplicar}
         </article>`;
-        }).join("") : `
-          <div class="photo-empty wide">Aún no hay fotos guardadas para este equipo. Dale nombre al primer punto y toma o adjunta la foto.</div>
-        `;
-      const nombrePuntoActual = state.levantamientoPuntoNombre || "";
-      const chipsPuntoHtml = PUNTOS_LEVANTAMIENTO_SUGERIDOS.map(nombre => {
-        const activo = nombrePuntoActual.trim().toLowerCase() === nombre.toLowerCase();
-        return `<button type="button" class="point-chip${activo ? " active" : ""}" onclick="elegirChipPuntoLevantamiento('${escapeHtml(nombre)}')">${escapeHtml(nombre)}</button>`;
-      }).join("");
+        }).join("");
+      const nombresUsados = new Set(fotos.map(f => nombreBaseDePunto(String(f.categoria || f.tipo || "")).toLowerCase()));
+      const pendientesHtml = PUNTOS_LEVANTAMIENTO_SUGERIDOS
+        .filter(nombre => !nombresUsados.has(nombre.toLowerCase()))
+        .map(nombre => `<article class="photo-card photo-card-empty" onclick="abrirModalPuntoLevantamiento('${escapeHtml(nombre)}')">
+          <div class="photo-empty-slot"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7l1.5-2.5h5L16 7"/><circle cx="12" cy="13.5" r="3.4"/></svg></div>
+          <strong>${escapeHtml(nombre)}</strong>
+          <span>Toca para agregar</span>
+        </article>`).join("");
+      const agregarPuntoHtml = `<article class="photo-card photo-card-add" onclick="abrirModalNuevoPuntoLevantamiento()">
+          <div class="photo-empty-slot">+</div>
+          <strong>Agregar punto</strong>
+          <span>Nombre libre</span>
+        </article>`;
         view.querySelector(".module-panel").innerHTML = equipo ? `
           <div>
             <div class="lift-toolbar">
@@ -1242,24 +1254,8 @@ function renderModules() {
             </div>
             ${state.levantamiento?.descripcion && !/migrad/i.test(state.levantamiento.descripcion) ? `<p>${escapeHtml(state.levantamiento.descripcion)}</p>` : ""}
             ${renderLubricantesDeEquipo(equipo.id)}
-            <div class="photo-grid" aria-label="Fotos de levantamiento">${state.levantamientoLoading ? `<div class="photo-empty wide">Cargando evidencia...</div>` : fotosHtml}</div>
-          </div>
-          <div class="photo-uploader">
-            <strong>Agregar punto de levantamiento</strong>
-            <label>Nombre del punto
-              <input id="levantamiento-punto-nombre" type="text" placeholder="Ej. Reductor, Chumacera superior..." value="${escapeHtml(nombrePuntoActual)}" oninput="actualizarNombrePuntoLevantamiento(this.value)">
-            </label>
-            <div class="point-chip-row">${chipsPuntoHtml}</div>
-            <div class="photo-input-row">
-              <label>Tomar foto
-                <input id="levantamiento-foto-camara" type="file" accept="image/*" capture="environment">
-              </label>
-              <label>Adjuntar archivo
-                <input id="levantamiento-foto-archivo" type="file" accept="image/*">
-              </label>
-            </div>
-            <button onclick="guardarFotoLevantamiento()">Guardar punto</button>
-            <small class="muted">Si el nombre dice "placa", esa foto queda solo como referencia para los cálculos y no aparece en la carta.</small>
+            <p class="muted" style="margin:4px 0 0">Toca cualquier cuadro para tomar o adjuntar su foto. Si el nombre dice "placa", esa foto queda solo de referencia para los cálculos y no sale en la carta.</p>
+            <div class="photo-grid" aria-label="Fotos de levantamiento">${state.levantamientoLoading ? `<div class="photo-empty wide">Cargando evidencia...</div>` : `${fotosHtml}${pendientesHtml}${agregarPuntoHtml}`}</div>
           </div>` : `
           <div>
             <p class="eyebrow">Levantamiento</p>

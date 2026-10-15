@@ -280,14 +280,53 @@ function nombrePuntoSinDuplicar(nombreBase, equipoId) {
   return `${base} ${siguiente}`;
 }
 
-function actualizarNombrePuntoLevantamiento(valor) {
-  state.levantamientoPuntoNombre = valor;
-  renderModules();
+// Quita el numero final de un nombre ("Chumacera 2" -> "Chumacera")
+// para saber a que punto "base" pertenece una foto.
+function nombreBaseDePunto(nombre) {
+  return String(nombre || "").replace(/ \d+$/, "").trim();
 }
 
-function elegirChipPuntoLevantamiento(nombre) {
+// Abre la ventana emergente de "Tomar foto / Adjuntar archivo" para un
+// punto ya nombrado (tocaron un cuadro sugerido, uno ya existente para
+// agregar otro igual, o cualquier cuadro para reemplazar su foto).
+function abrirModalPuntoLevantamiento(nombre) {
   state.levantamientoPuntoNombre = nombre;
-  renderModules();
+  abrirModal(`
+    <div class="levantamiento-modal">
+      <p class="eyebrow">Punto de levantamiento</p>
+      <h3>${escapeHtml(nombre)}</h3>
+      <input type="hidden" id="levantamiento-punto-nombre" value="${escapeHtml(nombre)}">
+      <div class="photo-input-row">
+        <label>Tomar foto
+          <input id="levantamiento-foto-camara" type="file" accept="image/*" capture="environment" onchange="guardarFotoLevantamientoYcerrar()">
+        </label>
+        <label>Adjuntar archivo
+          <input id="levantamiento-foto-archivo" type="file" accept="image/*" onchange="guardarFotoLevantamientoYcerrar()">
+        </label>
+      </div>
+    </div>
+  `);
+}
+
+// Igual, pero para un punto con nombre libre (no esta en la lista de
+// sugerencias) - primero pide el nombre.
+function abrirModalNuevoPuntoLevantamiento() {
+  state.levantamientoPuntoNombre = "";
+  abrirModal(`
+    <div class="levantamiento-modal">
+      <p class="eyebrow">Nuevo punto de levantamiento</p>
+      <h3>Nombre del punto</h3>
+      <input id="levantamiento-punto-nombre" type="text" placeholder="Ej. Motor lado carga, Chumacera superior..." oninput="state.levantamientoPuntoNombre = this.value">
+      <div class="photo-input-row">
+        <label>Tomar foto
+          <input id="levantamiento-foto-camara" type="file" accept="image/*" capture="environment" onchange="guardarFotoLevantamientoYcerrar()">
+        </label>
+        <label>Adjuntar archivo
+          <input id="levantamiento-foto-archivo" type="file" accept="image/*" onchange="guardarFotoLevantamientoYcerrar()">
+        </label>
+      </div>
+    </div>
+  `);
 }
 
 // Respaldo para cuando el orden de subida no quedo como se queria
@@ -328,14 +367,24 @@ async function guardarFotoLevantamiento() {
   const fotoArchivo = $("levantamiento-foto-archivo")?.files?.[0];
   const file = fotoCamara || fotoArchivo || $("levantamiento-foto")?.files?.[0];
   const nombreCrudo = $("levantamiento-punto-nombre")?.value || state.levantamientoPuntoNombre || "";
-  if (!equipo) return setStatus("Selecciona un equipo antes de guardar fotos.", "warn");
+  if (!equipo) {
+    setStatus("Selecciona un equipo antes de guardar fotos.", "warn");
+    return false;
+  }
   if (!nombreCrudo.trim()) {
     setStatus("Escribe o elige el nombre del punto antes de guardar.", "warn");
     mostrarAvisoFlotante("Primero dale un nombre al punto (ej. Motor, Reductor...).", "error");
-    return;
+    return false;
   }
-  if (!file) return setStatus("Primero elige o toma una foto.", "warn");
-  if (!cfg.tables.fotos) return setStatus("No esta configurada la tabla de fotos.", "error");
+  if (!file) {
+    setStatus("Primero elige o toma una foto.", "warn");
+    mostrarAvisoFlotante("Primero elige o toma una foto.", "error");
+    return false;
+  }
+  if (!cfg.tables.fotos) {
+    setStatus("No esta configurada la tabla de fotos.", "error");
+    return false;
+  }
 
   const clasificacion = clasificarPuntoLevantamiento(nombreCrudo);
   const nombreFinal = clasificacion.tipo === "foto_equipo"
@@ -390,10 +439,21 @@ async function guardarFotoLevantamiento() {
         : `Foto de levantamiento guardada. La carta de ${escapeHtml(etiquetaEquipo)} sigue Pendiente hasta que la llenes y le des "Guardar carta".`,
       "ok"
     );
+    return true;
   } catch (err) {
     console.warn("No se pudo guardar foto:", err.message);
     setStatus(`No se pudo guardar foto: ${err.message}`, "error");
+    mostrarAvisoFlotante(`No se pudo guardar la foto: ${err.message}`, "error");
+    return false;
   }
+}
+
+// Usado por la ventana emergente: guarda y, solo si salio bien, la
+// cierra. Si algo fallo (ej. nombre vacio), se queda abierta con el
+// aviso para que el tecnico lo intente de nuevo.
+async function guardarFotoLevantamientoYcerrar() {
+  const ok = await guardarFotoLevantamiento();
+  if (ok) cerrarModal();
 }
 
 async function eliminarFotoLevantamiento(fotoId) {
