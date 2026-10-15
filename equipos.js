@@ -238,7 +238,7 @@ async function loadLevantamientoForSelectedEquipo() {
 // cualquier otro nombre libremente.
 const PUNTOS_LEVANTAMIENTO_SUGERIDOS = [
   "Foto completa del equipo", "Motor", "Placa del motor", "Reductor",
-  "Placa del reductor", "Chumacera", "Rodamiento", "Acople", "Banda"
+  "Placa del reductor", "Chumacera", "Placa de la chumacera"
 ];
 
 // Decide en que "cajon" cae un punto segun su nombre: foto_equipo,
