@@ -105,10 +105,17 @@ function fotosPuntosDeEquipo(equipoId) {
 }
 
 function etiquetaFotoPunto(foto, index) {
+  // Las fotos nuevas (levantamiento con puntos con nombre) guardan el
+  // nombre real del punto en "categoria" (ej. "Motor lado carga"). Las
+  // fotos viejas, de antes de ese cambio, guardan ahi un valor generico
+  // del menu anterior ("punto_lubricacion", "foto_equipo", etc.) - para
+  // esas seguimos usando el numero generico "Punto N" como antes.
+  const categoriaCruda = String(firstValue(foto, ["categoria"], "")).trim();
+  const esValorGenericoViejo = /^(punto_lubricacion|foto_equipo|placa|referencia|otra)$/i.test(categoriaCruda);
+  if (categoriaCruda && !esValorGenericoViejo) return categoriaCruda;
   const tipo = fotoTipo(foto);
   if (tipo.includes("placa")) return "Placa";
   if (tipo.includes("referencia")) return "Referencia";
-  if (tipo.includes("punto") || tipo.includes("lubricacion")) return `Punto ${index + 1}`;
   return `Punto ${index + 1}`;
 }
 
@@ -180,6 +187,7 @@ async function loadLevantamientoForSelectedEquipo() {
   const equipo = selectedEquipo();
   state.levantamiento = null;
   state.fotos = [];
+  state.levantamientoPuntoNombre = "";
   if (!equipo || !cfg.tables.levantamientos || !cfg.tables.fotos) return;
 
   state.levantamientoLoading = true;
@@ -197,7 +205,7 @@ async function loadLevantamientoForSelectedEquipo() {
       .select("id,empresa_id,equipo_id,usuario_id,tipo,categoria,url,storage_path,file_name,mime_type,created_at")
       .eq("empresa_id", state.empresaId)
       .eq("equipo_id", equipo.id)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: true });
 
     const [levantamientoResult, fotosResult] = await Promise.all([levantamientoQuery, fotosQuery]);
     if (levantamientoResult.error) throw levantamientoResult.error;
@@ -225,15 +233,82 @@ async function loadLevantamientoForSelectedEquipo() {
   }
 }
 
+// Puntos comunes sugeridos al nombrar un punto de levantamiento. Son
+// solo sugerencias rapidas (chips) - el tecnico puede escribir
+// cualquier otro nombre libremente.
+const PUNTOS_LEVANTAMIENTO_SUGERIDOS = [
+  "Foto completa del equipo", "Motor", "Placa del motor", "Reductor",
+  "Placa del reductor", "Chumacera", "Rodamiento", "Acople", "Banda"
+];
+
+// Decide en que "cajon" cae un punto segun su nombre: foto_equipo,
+// placa (solo referencia para Jesus, nunca aparece en la carta) o
+// punto_lubricacion (si aparece en la carta). La deteccion de "placa"
+// es automatica: si el nombre incluye la palabra "placa" en cualquier
+// parte, se guarda como referencia.
+function clasificarPuntoLevantamiento(nombre) {
+  const limpio = String(nombre || "").trim();
+  if (!limpio) return null;
+  const lower = limpio.toLowerCase();
+  if (lower === "foto completa del equipo" || lower === "foto_equipo" || lower === "equipo") {
+    return { tipo: "foto_equipo", categoria: "Foto completa del equipo" };
+  }
+  if (lower.includes("placa")) {
+    return { tipo: "placa", categoria: limpio };
+  }
+  return { tipo: "punto_lubricacion", categoria: limpio };
+}
+
+// Si el tecnico repite un nombre (ej. "Chumacera" dos veces en el
+// mismo equipo), le agrega un numero automaticamente para no
+// confundir una foto con otra: "Chumacera", "Chumacera 2", "Chumacera 3"...
+function nombrePuntoSinDuplicar(nombreBase, equipoId) {
+  const base = String(nombreBase || "").trim();
+  if (!base) return base;
+  const existentes = (state.fotos || [])
+    .filter(f => String(f.equipo_id) === String(equipoId))
+    .map(f => String(f.categoria || "").trim());
+  const escapado = base.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const patron = new RegExp(`^${escapado}( \\d+)?$`, "i");
+  const usados = existentes.filter(e => patron.test(e));
+  if (!usados.length) return base;
+  let siguiente = 2;
+  usados.forEach(u => {
+    const match = u.match(/ (\d+)$/);
+    if (match) siguiente = Math.max(siguiente, parseInt(match[1], 10) + 1);
+  });
+  return `${base} ${siguiente}`;
+}
+
+function actualizarNombrePuntoLevantamiento(valor) {
+  state.levantamientoPuntoNombre = valor;
+  renderModules();
+}
+
+function elegirChipPuntoLevantamiento(nombre) {
+  state.levantamientoPuntoNombre = nombre;
+  renderModules();
+}
+
 async function guardarFotoLevantamiento() {
   const equipo = selectedEquipo();
   const fotoCamara = $("levantamiento-foto-camara")?.files?.[0];
   const fotoArchivo = $("levantamiento-foto-archivo")?.files?.[0];
   const file = fotoCamara || fotoArchivo || $("levantamiento-foto")?.files?.[0];
-  const categoria = $("levantamiento-categoria")?.value || "foto_equipo";
+  const nombreCrudo = $("levantamiento-punto-nombre")?.value || state.levantamientoPuntoNombre || "";
   if (!equipo) return setStatus("Selecciona un equipo antes de guardar fotos.", "warn");
+  if (!nombreCrudo.trim()) {
+    setStatus("Escribe o elige el nombre del punto antes de guardar.", "warn");
+    mostrarAvisoFlotante("Primero dale un nombre al punto (ej. Motor, Reductor...).", "error");
+    return;
+  }
   if (!file) return setStatus("Primero elige o toma una foto.", "warn");
   if (!cfg.tables.fotos) return setStatus("No esta configurada la tabla de fotos.", "error");
+
+  const clasificacion = clasificarPuntoLevantamiento(nombreCrudo);
+  const nombreFinal = clasificacion.tipo === "foto_equipo"
+    ? clasificacion.categoria
+    : nombrePuntoSinDuplicar(clasificacion.categoria, equipo.id);
 
   try {
     setStatus("Guardando foto de levantamiento...", "warn");
@@ -243,8 +318,8 @@ async function guardarFotoLevantamiento() {
       empresa_id: state.empresaId,
       equipo_id: equipo.id,
       usuario_id: user?.id || null,
-      tipo: categoria,
-      categoria,
+      tipo: clasificacion.tipo,
+      categoria: nombreFinal,
       url: dataUrl,
       file_name: file.name,
       mime_type: file.type || "image/jpeg"

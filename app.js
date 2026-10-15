@@ -31,6 +31,7 @@ const state = {
   selectedUserId: "",
   actividadesLoading: false,
   levantamiento: null,
+  levantamientoPuntoNombre: "",
   fotos: [],
   fotosEmpresa: [],
   photoUrlCache: {},
@@ -1201,6 +1202,7 @@ function renderModules() {
         const title = esFotoEquipo(foto) || /^foto[\s_]?equipo$/i.test(tituloCrudo)
           ? "Foto completa del equipo"
           : tituloCrudo;
+        const esSoloReferencia = fotoTipo(foto) === "placa";
         const puedeEliminar = fotosReales.has(String(foto.id));
         const botonEliminar = puedeEliminar
           ? `<button class="photo-delete-button" type="button" title="Eliminar foto" aria-label="Eliminar foto" onclick="event.stopPropagation(); eliminarFotoLevantamiento('${escapeHtml(String(foto.id))}')">&times;</button>`
@@ -1209,11 +1211,16 @@ function renderModules() {
           ${botonEliminar}
           ${src ? `<img src="${escapeHtml(src)}" alt="${escapeHtml(title)}" referrerpolicy="no-referrer">` : `<div class="photo-empty">Archivo en Storage</div>`}
           <strong>${escapeHtml(title)}</strong>
-          <span>${escapeHtml(foto.file_name || foto.storage_path || "Sin nombre de archivo")}</span>
+          <span>${esSoloReferencia ? "Solo referencia - no sale en la carta" : (foto.file_name || foto.storage_path || "Sin nombre de archivo")}</span>
         </article>`;
         }).join("") : `
-          <div class="photo-empty wide">Aún no hay fotos guardadas para este equipo. Toma o adjunta la primera foto.</div>
+          <div class="photo-empty wide">Aún no hay fotos guardadas para este equipo. Dale nombre al primer punto y toma o adjunta la foto.</div>
         `;
+      const nombrePuntoActual = state.levantamientoPuntoNombre || "";
+      const chipsPuntoHtml = PUNTOS_LEVANTAMIENTO_SUGERIDOS.map(nombre => {
+        const activo = nombrePuntoActual.trim().toLowerCase() === nombre.toLowerCase();
+        return `<button type="button" class="point-chip${activo ? " active" : ""}" onclick="elegirChipPuntoLevantamiento('${escapeHtml(nombre)}')">${escapeHtml(nombre)}</button>`;
+      }).join("");
         view.querySelector(".module-panel").innerHTML = equipo ? `
           <div>
             <div class="lift-toolbar">
@@ -1233,16 +1240,11 @@ function renderModules() {
             <div class="photo-grid" aria-label="Fotos de levantamiento">${state.levantamientoLoading ? `<div class="photo-empty wide">Cargando evidencia...</div>` : fotosHtml}</div>
           </div>
           <div class="photo-uploader">
-            <strong>Agregar foto de levantamiento</strong>
-            <label>Tipo de foto
-              <select id="levantamiento-categoria">
-                <option value="foto_equipo">Foto completa del equipo</option>
-                <option value="placa">Placa</option>
-                <option value="punto_lubricacion">Punto de lubricación</option>
-                <option value="referencia">Referencia</option>
-                <option value="otra">Otra</option>
-              </select>
+            <strong>Agregar punto de levantamiento</strong>
+            <label>Nombre del punto
+              <input id="levantamiento-punto-nombre" type="text" placeholder="Ej. Reductor, Chumacera superior..." value="${escapeHtml(nombrePuntoActual)}" oninput="actualizarNombrePuntoLevantamiento(this.value)">
             </label>
+            <div class="point-chip-row">${chipsPuntoHtml}</div>
             <div class="photo-input-row">
               <label>Tomar foto
                 <input id="levantamiento-foto-camara" type="file" accept="image/*" capture="environment">
@@ -1251,7 +1253,8 @@ function renderModules() {
                 <input id="levantamiento-foto-archivo" type="file" accept="image/*">
               </label>
             </div>
-            <button onclick="guardarFotoLevantamiento()">Guardar foto</button>
+            <button onclick="guardarFotoLevantamiento()">Guardar punto</button>
+            <small class="muted">Si el nombre dice "placa", esa foto queda solo como referencia para los cálculos y no aparece en la carta.</small>
           </div>` : `
           <div>
             <p class="eyebrow">Levantamiento</p>

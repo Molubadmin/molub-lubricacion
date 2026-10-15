@@ -289,6 +289,10 @@ select:disabled,input:disabled{opacity:.72;cursor:not-allowed}
 .photo-card strong,.photo-card span{display:block}.photo-card span{color:var(--muted);font-size:12px;margin-top:4px;overflow-wrap:anywhere}
 .photo-empty{min-height:150px;display:grid;place-items:center;color:var(--muted);font-weight:800;text-align:center}.photo-empty.wide{grid-column:1/-1}
 .photo-uploader{align-self:start;display:grid;gap:12px;min-width:240px;background:#f8faff;border:1px solid var(--line);border-radius:16px;padding:16px}.photo-uploader strong{font-size:16px}.photo-uploader label{display:grid;gap:7px;color:var(--muted);font-weight:900;font-size:12px;text-transform:uppercase}.photo-uploader select,.photo-uploader input{width:100%;border:1px solid var(--line);border-radius:10px;background:#fff;padding:10px;color:var(--ink);font-weight:800}.photo-input-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.photo-input-row label{margin:0}@media(max-width:760px){.photo-input-row{grid-template-columns:1fr}}
+.point-chip-row{display:flex;flex-wrap:wrap;gap:8px}
+.point-chip{border:1px solid var(--line);border-radius:999px;background:#fff;color:var(--ink);font-size:12px;font-weight:800;padding:7px 12px;cursor:pointer}
+.point-chip:hover{border-color:var(--blue)}
+.point-chip.active{background:var(--ink);border-color:var(--ink);color:#fff}
 .cartas-realizadas-view{display:grid;gap:16px}
 .legacy-page-hero{background:linear-gradient(135deg,var(--ink),var(--blue));color:#fff;border-radius:18px;padding:22px 26px;overflow:hidden;position:relative}
 .legacy-page-hero::after{content:"";position:absolute;right:-40px;top:-30px;width:180px;height:180px;border-radius:50%;background:rgba(255,255,255,.12)}
