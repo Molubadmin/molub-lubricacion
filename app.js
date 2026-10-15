@@ -1196,7 +1196,7 @@ function renderModules() {
             : "Sin levantamiento";
       const fotos = fotosLevantamientoParaEquipo(equipo);
       const fotosReales = new Set((state.fotos || []).map(item => String(item.id)));
-      const fotosHtml = fotos.length ? fotos.map(foto => {
+      const fotosHtml = fotos.length ? fotos.map((foto, idx) => {
         const src = fotoSrc(foto);
         const tituloCrudo = String(foto.categoria || foto.tipo || foto.file_name || "Foto");
         const title = esFotoEquipo(foto) || /^foto[\s_]?equipo$/i.test(tituloCrudo)
@@ -1207,8 +1207,13 @@ function renderModules() {
         const botonEliminar = puedeEliminar
           ? `<button class="photo-delete-button" type="button" title="Eliminar foto" aria-label="Eliminar foto" onclick="event.stopPropagation(); eliminarFotoLevantamiento('${escapeHtml(String(foto.id))}')">&times;</button>`
           : "";
+        const botonesOrden = puedeEliminar ? `<div class="photo-order-buttons">
+            <button type="button" title="Subir" aria-label="Subir" ${idx === 0 ? "disabled" : ""} onclick="event.stopPropagation(); moverPuntoLevantamiento('${escapeHtml(String(foto.id))}','subir')">&uarr;</button>
+            <button type="button" title="Bajar" aria-label="Bajar" ${idx === fotos.length - 1 ? "disabled" : ""} onclick="event.stopPropagation(); moverPuntoLevantamiento('${escapeHtml(String(foto.id))}','bajar')">&darr;</button>
+          </div>` : "";
         return `<article class="photo-card"${src ? ` onclick="verFotoDesdeCard(this)"` : ""}>
           ${botonEliminar}
+          ${botonesOrden}
           ${src ? `<img src="${escapeHtml(src)}" alt="${escapeHtml(title)}" referrerpolicy="no-referrer">` : `<div class="photo-empty">Archivo en Storage</div>`}
           <strong>${escapeHtml(title)}</strong>
           <span>${esSoloReferencia ? "Solo referencia - no sale en la carta" : (foto.file_name || foto.storage_path || "Sin nombre de archivo")}</span>

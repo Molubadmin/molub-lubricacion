@@ -290,6 +290,38 @@ function elegirChipPuntoLevantamiento(nombre) {
   renderModules();
 }
 
+// Respaldo para cuando el orden de subida no quedo como se queria
+// (ej. se tomo la foto de la placa antes que la del motor). El orden
+// de la galeria y de la carta se basa en "created_at", asi que
+// reordenar es simplemente intercambiar esa fecha entre la foto y su
+// vecina - no hace falta ninguna columna nueva.
+async function moverPuntoLevantamiento(fotoId, direccion) {
+  const equipo = selectedEquipo();
+  if (!equipo || !cfg.tables.fotos) return;
+  const lista = state.fotos || [];
+  const index = lista.findIndex(f => String(f.id) === String(fotoId));
+  if (index === -1) return;
+  const destino = direccion === "subir" ? index - 1 : index + 1;
+  if (destino < 0 || destino >= lista.length) return;
+
+  const actual = lista[index];
+  const vecino = lista[destino];
+  try {
+    setStatus("Reordenando...", "warn");
+    const [r1, r2] = await Promise.all([
+      sb.from(cfg.tables.fotos).update({ created_at: vecino.created_at }).eq("id", actual.id),
+      sb.from(cfg.tables.fotos).update({ created_at: actual.created_at }).eq("id", vecino.id)
+    ]);
+    if (r1.error) throw r1.error;
+    if (r2.error) throw r2.error;
+    await loadLevantamientoForSelectedEquipo();
+    setStatus("Orden actualizado.", "");
+  } catch (err) {
+    console.warn("No se pudo reordenar:", err.message);
+    setStatus(`No se pudo reordenar: ${err.message}`, "error");
+  }
+}
+
 async function guardarFotoLevantamiento() {
   const equipo = selectedEquipo();
   const fotoCamara = $("levantamiento-foto-camara")?.files?.[0];
