@@ -1207,9 +1207,15 @@ function renderModules() {
         const botonEliminar = puedeEliminar
           ? `<button class="photo-delete-button" type="button" title="Eliminar foto" aria-label="Eliminar foto" onclick="event.stopPropagation(); eliminarFotoLevantamiento('${escapeHtml(String(foto.id))}')">&times;</button>`
           : "";
-        const botonesOrden = puedeEliminar ? `<div class="photo-order-buttons">
-            <button type="button" title="Subir" aria-label="Subir" ${idx === 0 ? "disabled" : ""} onclick="event.stopPropagation(); moverPuntoLevantamiento('${escapeHtml(String(foto.id))}','subir')">&uarr;</button>
-            <button type="button" title="Bajar" aria-label="Bajar" ${idx === fotos.length - 1 ? "disabled" : ""} onclick="event.stopPropagation(); moverPuntoLevantamiento('${escapeHtml(String(foto.id))}','bajar')">&darr;</button>
+        // Las flechas solo tienen sentido entre fotos del MISMO tipo
+        // (ej. "Motor" y "Motor 2") - el orden entre tipos distintos
+        // ya lo decide solo el orden fijo (ver PUNTOS_LEVANTAMIENTO_SUGERIDOS),
+        // moverlas ahi no cambiaria nada.
+        const mismoTipoQueAnterior = idx > 0 && indiceCanonicoDePunto(foto) === indiceCanonicoDePunto(fotos[idx - 1]);
+        const mismoTipoQueSiguiente = idx < fotos.length - 1 && indiceCanonicoDePunto(foto) === indiceCanonicoDePunto(fotos[idx + 1]);
+        const botonesOrden = puedeEliminar && (mismoTipoQueAnterior || mismoTipoQueSiguiente) ? `<div class="photo-order-buttons">
+            <button type="button" title="Subir" aria-label="Subir" ${mismoTipoQueAnterior ? "" : "disabled"} onclick="event.stopPropagation(); moverPuntoLevantamiento('${escapeHtml(String(foto.id))}','subir')">&uarr;</button>
+            <button type="button" title="Bajar" aria-label="Bajar" ${mismoTipoQueSiguiente ? "" : "disabled"} onclick="event.stopPropagation(); moverPuntoLevantamiento('${escapeHtml(String(foto.id))}','bajar')">&darr;</button>
           </div>` : "";
         const baseDelNombre = nombreBaseDePunto(title);
         const permiteDuplicar = puedeEliminar && baseDelNombre.toLowerCase() !== "foto completa del equipo";

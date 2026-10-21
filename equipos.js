@@ -101,7 +101,8 @@ function esFotoPuntoLubricacion(foto) {
 }
 
 function fotosPuntosDeEquipo(equipoId) {
-  return fotosEmpresaDeEquipo(equipoId).filter(foto => !esFotoEquipo(foto) && esFotoPuntoLubricacion(foto));
+  const filtradas = fotosEmpresaDeEquipo(equipoId).filter(foto => !esFotoEquipo(foto) && esFotoPuntoLubricacion(foto));
+  return ordenarPuntosLevantamiento(filtradas);
 }
 
 function etiquetaFotoPunto(foto, index) {
@@ -212,7 +213,7 @@ async function loadLevantamientoForSelectedEquipo() {
     if (fotosResult.error) throw fotosResult.error;
 
     state.levantamiento = levantamientoResult.data?.[0] || null;
-    state.fotos = await Promise.all((fotosResult.data || []).map(withSignedFotoUrl));
+    state.fotos = ordenarPuntosLevantamiento(await Promise.all((fotosResult.data || []).map(withSignedFotoUrl)));
     if (!state.fotos.length) {
       // Este equipo no tiene fotos propias todavia; la galeria cae
       // en mostrar las fotos de su carta guardada (si tiene). Nos
@@ -233,30 +234,59 @@ async function loadLevantamientoForSelectedEquipo() {
   }
 }
 
-// Puntos comunes sugeridos al nombrar un punto de levantamiento. Son
-// solo sugerencias rapidas (chips) - el tecnico puede escribir
-// cualquier otro nombre libremente.
+// Puntos comunes sugeridos al nombrar un punto de levantamiento. Este
+// mismo orden es el que se usa para ACOMODAR la galeria y la carta
+// (ver ordenarPuntosLevantamiento mas abajo) - no solo son chips de
+// sugerencia, tambien definen el orden final sin importar en que
+// orden el tecnico fue tomando las fotos.
 const PUNTOS_LEVANTAMIENTO_SUGERIDOS = [
   "Foto completa del equipo", "Motor", "Placa del motor", "Reductor",
-  "Placa del reductor", "Chumacera", "Placa de la chumacera"
+  "Placa del reductor", "Chumacera", "Placa de la chumacera",
+  "Cople", "Código del cople"
 ];
+
+function quitarAcentos(texto) {
+  return String(texto || "").normalize("NFD").replace(/[̀-ͯ]/g, "");
+}
 
 // Decide en que "cajon" cae un punto segun su nombre: foto_equipo,
 // placa (solo referencia para Jesus, nunca aparece en la carta) o
-// punto_lubricacion (si aparece en la carta). La deteccion de "placa"
-// es automatica: si el nombre incluye la palabra "placa" en cualquier
-// parte, se guarda como referencia.
+// punto_lubricacion (si aparece en la carta). La deteccion es
+// automatica: si el nombre incluye "placa" o "codigo" en cualquier
+// parte (ej. "Codigo del cople"), se guarda como referencia.
 function clasificarPuntoLevantamiento(nombre) {
   const limpio = String(nombre || "").trim();
   if (!limpio) return null;
-  const lower = limpio.toLowerCase();
+  const lower = quitarAcentos(limpio.toLowerCase());
   if (lower === "foto completa del equipo" || lower === "foto_equipo" || lower === "equipo") {
     return { tipo: "foto_equipo", categoria: "Foto completa del equipo" };
   }
-  if (lower.includes("placa")) {
+  if (lower.includes("placa") || lower.includes("codigo")) {
     return { tipo: "placa", categoria: limpio };
   }
   return { tipo: "punto_lubricacion", categoria: limpio };
+}
+
+// Indice del punto dentro del orden fijo de PUNTOS_LEVANTAMIENTO_SUGERIDOS
+// (ignora el numero de duplicado, "Motor 2" cuenta como "Motor"). Los
+// nombres que el tecnico escribio libres, que no estan en la lista,
+// quedan al final, en el orden en que se fueron creando.
+function indiceCanonicoDePunto(foto) {
+  const base = quitarAcentos(nombreBaseDePunto(String(foto.categoria || foto.tipo || "")).toLowerCase());
+  const idx = PUNTOS_LEVANTAMIENTO_SUGERIDOS.findIndex(n => quitarAcentos(n.toLowerCase()) === base);
+  return idx === -1 ? PUNTOS_LEVANTAMIENTO_SUGERIDOS.length : idx;
+}
+
+// Acomoda las fotos de un equipo en el orden fijo de arriba, sin
+// importar el orden en que se tomaron. Dentro del mismo tipo (ej.
+// "Motor" y "Motor 2"), respeta el orden de creacion - por eso las
+// flechas subir/bajar siguen funcionando para decidir cual va primero.
+function ordenarPuntosLevantamiento(fotos) {
+  return [...(fotos || [])].sort((a, b) => {
+    const diferencia = indiceCanonicoDePunto(a) - indiceCanonicoDePunto(b);
+    if (diferencia !== 0) return diferencia;
+    return String(a.created_at || "").localeCompare(String(b.created_at || ""));
+  });
 }
 
 // Si el tecnico repite un nombre (ej. "Chumacera" dos veces en el
