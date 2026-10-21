@@ -286,11 +286,37 @@ function nombreBaseDePunto(nombre) {
   return String(nombre || "").replace(/ \d+$/, "").trim();
 }
 
+// Para equipos donde un mismo punto fisico sirve para varios puntos
+// de lubricacion (ej. la foto del motor sirve igual para "Rodamiento
+// lado carga" y "Rodamiento lado libre"), esto arma la galeria de
+// miniaturas para reusar una foto ya subida en vez de tomarla de
+// nuevo. Solo muestra fotos reales de ESTE equipo (no las de fallback
+// de la carta).
+function fotosExistentesHtml(equipoId) {
+  const fotos = (state.fotos || []).filter(f => String(f.equipo_id) === String(equipoId) && fotoSrc(f));
+  if (!fotos.length) return "";
+  const miniaturas = fotos.map(foto => {
+    const src = fotoSrc(foto);
+    const nombre = String(foto.categoria || foto.tipo || "Foto");
+    return `<button type="button" class="reuse-foto-thumb" title="Usar la foto de ${escapeHtml(nombre)}" onclick="guardarPuntoDesdeFotoExistenteYcerrar('${escapeHtml(String(foto.id))}')">
+      <img src="${escapeHtml(src)}" alt="${escapeHtml(nombre)}" referrerpolicy="no-referrer">
+      <span>${escapeHtml(nombre)}</span>
+    </button>`;
+  }).join("");
+  return `
+    <div class="reuse-foto-section">
+      <span class="reuse-foto-label">O usa una foto que ya subiste para este equipo</span>
+      <div class="reuse-foto-row">${miniaturas}</div>
+    </div>
+  `;
+}
+
 // Abre la ventana emergente de "Tomar foto / Adjuntar archivo" para un
 // punto ya nombrado (tocaron un cuadro sugerido, uno ya existente para
 // agregar otro igual, o cualquier cuadro para reemplazar su foto).
 function abrirModalPuntoLevantamiento(nombre) {
   state.levantamientoPuntoNombre = nombre;
+  const equipo = selectedEquipo();
   abrirModal(`
     <div class="levantamiento-modal">
       <p class="eyebrow">Punto de levantamiento</p>
@@ -304,6 +330,7 @@ function abrirModalPuntoLevantamiento(nombre) {
           <input id="levantamiento-foto-archivo" type="file" accept="image/*" onchange="guardarFotoLevantamientoYcerrar()">
         </label>
       </div>
+      ${equipo ? fotosExistentesHtml(equipo.id) : ""}
     </div>
   `);
 }
@@ -312,6 +339,7 @@ function abrirModalPuntoLevantamiento(nombre) {
 // sugerencias) - primero pide el nombre.
 function abrirModalNuevoPuntoLevantamiento() {
   state.levantamientoPuntoNombre = "";
+  const equipo = selectedEquipo();
   abrirModal(`
     <div class="levantamiento-modal">
       <p class="eyebrow">Nuevo punto de levantamiento</p>
@@ -325,6 +353,7 @@ function abrirModalNuevoPuntoLevantamiento() {
           <input id="levantamiento-foto-archivo" type="file" accept="image/*" onchange="guardarFotoLevantamientoYcerrar()">
         </label>
       </div>
+      ${equipo ? fotosExistentesHtml(equipo.id) : ""}
     </div>
   `);
 }
@@ -453,6 +482,72 @@ async function guardarFotoLevantamiento() {
 // aviso para que el tecnico lo intente de nuevo.
 async function guardarFotoLevantamientoYcerrar() {
   const ok = await guardarFotoLevantamiento();
+  if (ok) cerrarModal();
+}
+
+// Crea un punto nuevo reusando la IMAGEN de una foto ya subida de este
+// mismo equipo, en vez de tomar/adjuntar una otra vez - util cuando un
+// mismo punto fisico (ej. la foto del motor) sirve para mas de un
+// punto de lubricacion (Rodamiento lado carga / Rodamiento lado
+// libre).
+async function guardarPuntoDesdeFotoExistente(fotoOrigenId) {
+  const equipo = selectedEquipo();
+  const nombreCrudo = $("levantamiento-punto-nombre")?.value || state.levantamientoPuntoNombre || "";
+  if (!equipo) {
+    setStatus("Selecciona un equipo antes de guardar fotos.", "warn");
+    return false;
+  }
+  if (!nombreCrudo.trim()) {
+    setStatus("Escribe o elige el nombre del punto antes de guardar.", "warn");
+    mostrarAvisoFlotante("Primero dale un nombre al punto (ej. Motor, Reductor...).", "error");
+    return false;
+  }
+  const origen = (state.fotos || []).find(f => String(f.id) === String(fotoOrigenId));
+  if (!origen || !fotoSrc(origen)) {
+    mostrarAvisoFlotante("Esa foto ya no está disponible, elige otra.", "error");
+    return false;
+  }
+  if (!cfg.tables.fotos) {
+    setStatus("No esta configurada la tabla de fotos.", "error");
+    return false;
+  }
+
+  const clasificacion = clasificarPuntoLevantamiento(nombreCrudo);
+  const nombreFinal = clasificacion.tipo === "foto_equipo"
+    ? clasificacion.categoria
+    : nombrePuntoSinDuplicar(clasificacion.categoria, equipo.id);
+
+  try {
+    setStatus("Guardando punto de levantamiento...", "warn");
+    const user = activeUser();
+    const { error: fotoError } = await sb.from(cfg.tables.fotos).insert({
+      empresa_id: state.empresaId,
+      equipo_id: equipo.id,
+      usuario_id: user?.id || null,
+      tipo: clasificacion.tipo,
+      categoria: nombreFinal,
+      url: origen.url || origen.signed_url || fotoSrc(origen),
+      file_name: origen.file_name || "",
+      mime_type: origen.mime_type || "image/jpeg"
+    });
+    if (fotoError) throw fotoError;
+
+    await loadFotoCounts();
+    await loadLevantamientoForSelectedEquipo();
+    renderEquipos();
+    setStatus("Punto de levantamiento guardado.", "");
+    mostrarAvisoFlotante(`"${escapeHtml(nombreFinal)}" guardado reusando la foto de "${escapeHtml(origen.categoria || origen.tipo || "")}".`, "ok");
+    return true;
+  } catch (err) {
+    console.warn("No se pudo guardar el punto:", err.message);
+    setStatus(`No se pudo guardar el punto: ${err.message}`, "error");
+    mostrarAvisoFlotante(`No se pudo guardar el punto: ${err.message}`, "error");
+    return false;
+  }
+}
+
+async function guardarPuntoDesdeFotoExistenteYcerrar(fotoOrigenId) {
+  const ok = await guardarPuntoDesdeFotoExistente(fotoOrigenId);
   if (ok) cerrarModal();
 }
 
