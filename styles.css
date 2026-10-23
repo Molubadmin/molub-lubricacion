@@ -15,6 +15,9 @@ body.gate-activo .sidebar,body.gate-activo .mobile-menu-toggle,body.gate-activo 
 .acceso-gate-row input{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:14px;font-family:inherit}
 .acceso-gate-primary{width:100%;background:var(--blue);color:#fff;border:0;border-radius:10px;padding:13px;font-weight:900;font-size:14px;cursor:pointer}
 .acceso-gate-primary:hover{background:#0f1fd6}
+.acceso-gate-forgot{display:block;width:100%;background:none;border:0;color:var(--blue);font-weight:700;font-size:12.5px;padding:10px 0 0;cursor:pointer;text-align:center}
+.acceso-gate-forgot:hover{text-decoration:underline}
+.acceso-gate-forgot:disabled{opacity:.6;cursor:not-allowed;text-decoration:none}
 .gate-error{background:#fdeaea;color:#b42318;border-radius:10px;padding:10px 12px;font-size:13px;font-weight:700;margin:-8px 0 16px}
 .gate-error.hidden{display:none}
 .input-icon{position:relative}
@@ -290,6 +293,8 @@ select:disabled,input:disabled{opacity:.72;cursor:not-allowed}
 .photo-empty{min-height:150px;display:grid;place-items:center;color:var(--muted);font-weight:800;text-align:center}.photo-empty.wide{grid-column:1/-1}
 .photo-input-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.photo-input-row label{display:grid;gap:7px;margin:0;color:var(--muted);font-weight:900;font-size:12px;text-transform:uppercase}.photo-input-row input{width:100%;border:1px solid var(--line);border-radius:10px;background:#fff;padding:10px;color:var(--ink);font-weight:800}@media(max-width:760px){.photo-input-row{grid-template-columns:1fr}}
 .levantamiento-modal{display:grid;gap:12px;min-width:260px}.levantamiento-modal h3{margin:0 0 4px}.levantamiento-modal>input[type="text"]{width:100%;border:1px solid var(--line);border-radius:10px;background:#fff;padding:10px;color:var(--ink);font-weight:800}
+.levantamiento-modal label{display:grid;gap:6px;color:var(--muted);font-weight:900;font-size:12px;text-transform:uppercase}
+.levantamiento-modal label input[type="password"],.levantamiento-modal label input[type="text"]{width:100%;border:1px solid var(--line);border-radius:10px;background:#fff;padding:10px;color:var(--ink);font-weight:700;text-transform:none}
 .reuse-foto-section{display:grid;gap:8px;border-top:1px solid var(--line);padding-top:12px}
 .reuse-foto-label{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);font-weight:700}
 .reuse-foto-row{display:flex;flex-wrap:wrap;gap:8px;max-height:220px;overflow-y:auto}

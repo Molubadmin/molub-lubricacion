@@ -1946,6 +1946,75 @@ function traducirErrorAuth(mensaje) {
   return texto || "No se pudo iniciar sesión. Revisa tu correo y contraseña.";
 }
 
+async function solicitarRecuperarContrasenaGate() {
+  ocultarErrorGate();
+  const correo = $("gate-email")?.value.trim() || "";
+  if (!correo) {
+    mostrarErrorGate("Primero escribe tu correo arriba, luego dale a \"¿Olvidaste tu contraseña?\".");
+    return;
+  }
+  const boton = $("gate-forgot-link");
+  if (boton) {
+    boton.disabled = true;
+    boton.textContent = "Enviando...";
+  }
+  try {
+    const { error } = await sb.auth.resetPasswordForEmail(correo, {
+      redirectTo: window.location.origin + window.location.pathname
+    });
+    if (error) throw error;
+    mostrarAvisoFlotante(`Te enviamos un correo a ${escapeHtml(correo)} para crear una nueva contraseña.`, "ok");
+  } catch (err) {
+    mostrarErrorGate(`No se pudo enviar el correo de recuperación: ${err.message}`);
+  } finally {
+    if (boton) {
+      boton.disabled = false;
+      boton.textContent = "¿Olvidaste tu contraseña?";
+    }
+  }
+}
+
+function abrirModalNuevaContrasena() {
+  abrirModal(`
+    <div class="levantamiento-modal">
+      <p class="eyebrow">Recuperar acceso</p>
+      <h3>Crea tu nueva contraseña</h3>
+      <p id="nueva-contrasena-error" class="gate-error hidden"></p>
+      <label>Nueva contraseña
+        <input id="nueva-contrasena-1" type="password" autocomplete="new-password" placeholder="Mínimo 8 caracteres">
+      </label>
+      <label>Repite la contraseña
+        <input id="nueva-contrasena-2" type="password" autocomplete="new-password" placeholder="Escríbela otra vez">
+      </label>
+      <button onclick="guardarNuevaContrasena()">Guardar nueva contraseña</button>
+    </div>
+  `);
+}
+
+async function guardarNuevaContrasena() {
+  const errorEl = $("nueva-contrasena-error");
+  const ocultarError = () => errorEl?.classList.add("hidden");
+  const verError = (mensaje) => {
+    if (!errorEl) return;
+    errorEl.textContent = mensaje;
+    errorEl.classList.remove("hidden");
+  };
+  ocultarError();
+  const p1 = $("nueva-contrasena-1")?.value || "";
+  const p2 = $("nueva-contrasena-2")?.value || "";
+  if (p1.length < 8) return verError("La contraseña debe tener al menos 8 caracteres.");
+  if (p1 !== p2) return verError("Las dos contraseñas no son iguales.");
+
+  try {
+    const { error } = await sb.auth.updateUser({ password: p1 });
+    if (error) throw error;
+    cerrarModal();
+    mostrarAvisoFlotante("Tu contraseña se guardó correctamente. Ya puedes usarla para entrar.", "ok");
+  } catch (err) {
+    verError(`No se pudo guardar: ${err.message}`);
+  }
+}
+
 $("gate-login-btn")?.addEventListener("click", intentarLoginDesdeGate);
 $("gate-email")?.addEventListener("keydown", (event) => {
   if (event.key === "Enter") intentarLoginDesdeGate();
@@ -1956,6 +2025,10 @@ $("gate-password")?.addEventListener("keydown", (event) => {
 
 
 sb.auth.onAuthStateChange((_event, session) => {
+  if (_event === "PASSWORD_RECOVERY") {
+    abrirModalNuevaContrasena();
+    return;
+  }
   if (state.vistaQr || /[?&]carta=/.test(location.search)) {
     // La vista de un QR maneja sus propios datos con
     // obtener_carta_publica y no necesita (ni debe) sesion. Supabase
