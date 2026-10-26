@@ -1993,6 +1993,13 @@ async function solicitarRecuperarContrasenaGate() {
 }
 
 function abrirModalNuevaContrasena() {
+  // init() muestra la pantalla de login (acceso-gate, z-index mas
+  // alto que el modal) mientras Supabase todavia esta procesando el
+  // link del correo en segundo plano. Si no la ocultamos aqui, el
+  // modal se abre bien pero queda tapado detras del login - se ve
+  // como si el link "no hiciera nada" y solo mandara a la pantalla
+  // principal.
+  ocultarGateAcceso();
   abrirModal(`
     <div class="levantamiento-modal">
       <p class="eyebrow">Recuperar acceso</p>
