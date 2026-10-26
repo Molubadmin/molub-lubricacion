@@ -546,7 +546,7 @@ function elementoEditorRow(el, index) {
 
 function renderCartaEditorSection(carta, equipo, elementos) {
   if (!carta || !equipo) return "";
-  if (!isSupervisorMode()) return "";
+  if (!puedeEditarCartas()) return "";
   const firmas = typeof carta?.firmas === "object" && carta?.firmas ? carta.firmas : {};
   const filasHtml = elementos.length
     ? elementos.map((el, index) => elementoEditorRow(el, index)).join("")
@@ -579,7 +579,7 @@ function renderCartaEditorSection(carta, equipo, elementos) {
 }
 
 function agregarPuntoManualCarta() {
-  if (!isSupervisorMode()) return;
+  if (!puedeEditarCartas()) return;
   const carta = selectedCarta();
   const equipo = cartaEquipo(carta);
   if (!carta || !equipo) {
@@ -601,7 +601,7 @@ function agregarPuntoManualCarta() {
 }
 
 async function eliminarPuntoCarta(index) {
-  if (!isSupervisorMode()) return;
+  if (!puedeEditarCartas()) return;
   const carta = selectedCarta();
   const equipo = cartaEquipo(carta);
   if (!carta || !equipo) return;
@@ -647,9 +647,9 @@ async function eliminarPuntoCarta(index) {
 }
 
 async function guardarCartaCompleta() {
-  if (!isSupervisorMode()) {
-    setStatus("Solo supervisor/admin puede editar la carta de lubricación.", "warn");
-    mostrarAvisoFlotante("Solo supervisor/admin puede editar la carta.", "error");
+  if (!puedeEditarCartas()) {
+    setStatus("Solo MOLUB puede editar la carta de lubricación.", "warn");
+    mostrarAvisoFlotante("Solo MOLUB puede editar la carta de lubricación.", "error");
     return;
   }
   const carta = selectedCarta();

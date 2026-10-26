@@ -386,6 +386,16 @@ function esComisionista() {
   return (state.authPerfiles || []).some(p => String(p.rol || "").toUpperCase().includes("COMISION"));
 }
 
+// Editar la carta de lubricacion (elegir lubricante, cantidad,
+// frecuencia, agregar/quitar puntos) es trabajo de MOLUB, no de la
+// empresa cliente - un supervisor normal (ej. el de COVIA) solo debe
+// poder verla y descargarla, no cambiarla. En modo de prueba sin
+// sesion real se deja como antes para no estorbar pruebas internas.
+function puedeEditarCartas() {
+  if (!state.authUser) return isSupervisorMode();
+  return esAdminMolub() || esRevisorMolub();
+}
+
 function empresasPermitidasAuth() {
   // null = puede ver todas (admin MOLUB). Si no, regresa la lista de
   // empresa_id que le corresponden a este login (una sola para un
