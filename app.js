@@ -405,10 +405,14 @@ function puedeEditarCartas() {
 }
 
 function empresasPermitidasAuth() {
-  // null = puede ver todas (admin MOLUB). Si no, regresa la lista de
-  // empresa_id que le corresponden a este login (una sola para un
-  // tecnico/supervisor normal, varias para un comisionista).
-  if (esAdminMolub()) return null;
+  // null = puede ver todas. Admin MOLUB siempre; Revisor MOLUB
+  // (Sergio, Susana, Jesus) tambien, aunque en Supabase cada uno solo
+  // tenga vinculada una empresa - pueden cambiar de empresa en el
+  // selector igual que Admin MOLUB, pero siguen limitados a los
+  // mismos 5 modulos de siempre (ver roleAllowsView). Si no, regresa
+  // la lista de empresa_id que le corresponden a este login (una sola
+  // para un tecnico/supervisor normal, varias para un comisionista).
+  if (esAdminMolub() || esRevisorMolub()) return null;
   return [...new Set((state.authPerfiles || []).map(p => p.empresa_id).filter(Boolean))];
 }
 
