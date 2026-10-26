@@ -1099,8 +1099,12 @@ async function loadPerfiles() {
     return;
   }
   state.perfiles = (data || []).filter(perfil => {
+    // Solo tecnicos de campo son "trabajadores" asignables. Supervisor,
+    // Revisor MOLUB (Sergio, Susana, Jesus), Admin MOLUB y Comisionista
+    // no hacen trabajo de campo - no deben aparecer en la lista para
+    // programarles una actividad.
     const rol = String(perfil.rol || "").toUpperCase();
-    return !rol.includes("SUPERVISOR");
+    return !rol.includes("SUPERVISOR") && !rol.includes("REVISOR") && !rol.includes("MOLUB") && !rol.includes("COMISION");
   });
   syncUserPicker();
 }
