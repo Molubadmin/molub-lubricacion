@@ -262,6 +262,16 @@ function esRevisorMolub() {
 }
 
 function roleAllowsView(view) {
+  if (view === "modulos") {
+    // Activar/desactivar modulos de una empresa es una decision de
+    // MOLUB, no de la empresa cliente - un supervisor normal (ej. el
+    // de COVIA) no debe verlo ni tocarlo, solo Admin MOLUB. En modo
+    // de prueba sin sesion real (el selector de rol de arriba, sin
+    // haber iniciado sesion) se deja igual que antes para no estorbar
+    // las pruebas internas.
+    if (!state.authUser) return isSupervisorMode();
+    return esAdminMolub();
+  }
   if (esRevisorMolub()) {
     // Cuenta de revision interna de MOLUB: edita como supervisor,
     // pero solo ve estas 5 secciones - nada de actividades,
@@ -694,6 +704,10 @@ async function saveEmpresaModulo(id, activo) {
 }
 
 async function toggleModule(id) {
+  if (state.authUser && !esAdminMolub()) {
+    mostrarAvisoFlotante("Solo un administrador de MOLUB puede activar o desactivar módulos.", "error");
+    return;
+  }
   const prefs = modulesForCompany();
   prefs[id] = !moduleEnabled(id);
   saveLocalModulePrefs();
