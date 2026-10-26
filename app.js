@@ -194,6 +194,14 @@ function renderCompanyLogo(empresa) {
   } else {
     card.textContent = initials(empresa?.nombre);
   }
+  // El logo de la barra lateral tambien debe ser el de la empresa
+  // activa (quien usa la app es COVIA, DEACERO, etc. - no MOLUB) -
+  // si esa empresa no tiene logo propio cargado, se queda el de MOLUB.
+  const sidebarLogo = $("sidebar-brand-logo");
+  if (sidebarLogo) {
+    sidebarLogo.src = logoUrl || "./assets/logo-molub.png";
+    sidebarLogo.alt = empresa?.nombre || "MOLUB";
+  }
 }
 
 function groupByArea(equipos) {
