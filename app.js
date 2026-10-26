@@ -404,6 +404,14 @@ function puedeEditarCartas() {
   return esAdminMolub() || esRevisorMolub();
 }
 
+// Boton de "Descargar Excel" en Horas hombre - pedido para estas 3
+// personas en particular, no para todo el rol de supervisor.
+const CORREOS_EXCEL_HORAS = ["eliud.cerda@coviacorp.com", "eber.santiago@coviacorp.com", "jose.capetillo@coviacorp.com"];
+function puedeDescargarExcelHoras() {
+  const email = String(state.authUser?.email || "").trim().toLowerCase();
+  return CORREOS_EXCEL_HORAS.includes(email);
+}
+
 function empresasPermitidasAuth() {
   // null = puede ver todas. Admin MOLUB siempre; Revisor MOLUB
   // (Sergio, Susana, Jesus) tambien, aunque en Supabase cada uno solo
@@ -1542,7 +1550,10 @@ function renderModules() {
 
         view.querySelector(".module-panel").innerHTML = `
           <div class="module-wide">
-            <p class="eyebrow">Horas hombre</p>
+            <div class="panel-head compact-head">
+              <p class="eyebrow">Horas hombre</p>
+              ${puedeDescargarExcelHoras() ? `<button type="button" class="secondary-action" onclick="descargarExcelHoras()">Descargar Excel</button>` : ""}
+            </div>
             <h2>Resumen por técnico</h2>
             <div class="cards mini-cards hours-cards">
               <article><span>Horas extra</span><strong>${escapeHtml(resumen.totalHorasExtra)}</strong></article>
