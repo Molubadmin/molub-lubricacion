@@ -14,8 +14,17 @@
 // renderModules) — por eso este archivo se carga ANTES que app.js
 // en index.html.
 
+function toggleExtraFormSupervisor() {
+  state.extraFormSupervisorAbierto = !state.extraFormSupervisorAbierto;
+  renderModules();
+}
+
 async function guardarActividadExtra() {
-  const user = activeUser();
+  const esSupervisor = isSupervisorMode();
+  // Un supervisor que reporta su propia actividad usa su perfil real
+  // de la sesion (state.authPerfil), no el selector de "usuario de
+  // prueba" que normalmente queda vacio para supervisores.
+  const user = esSupervisor ? (state.authPerfil || activeUser()) : activeUser();
   const descripcion = $("extra-descripcion")?.value.trim();
   const equipoTexto = $("extra-equipo")?.value.trim();
   const horaInicio = $("extra-hora-inicio")?.value;
@@ -24,15 +33,12 @@ async function guardarActividadExtra() {
   const evidenciaTexto = $("extra-evidencia")?.value.trim();
   const foto = $("extra-foto")?.files?.[0];
 
-  if (isSupervisorMode()) {
-    setStatus("Cambia a rol técnico/eléctrico/contratista para registrar actividad extra.", "warn");
-    mostrarAvisoFlotante("Cambia a rol técnico/eléctrico/contratista para registrar.", "error");
-    return;
-  }
-
   if (!user) {
-    setStatus("Selecciona un usuario de prueba antes de guardar la actividad extra.", "warn");
-    mostrarAvisoFlotante("Selecciona un usuario de prueba antes de enviar.", "error");
+    const mensaje = esSupervisor
+      ? "No se encontró tu perfil de sesión. Vuelve a iniciar sesión e intenta de nuevo."
+      : "Selecciona un usuario de prueba antes de guardar la actividad extra.";
+    setStatus(mensaje, "warn");
+    mostrarAvisoFlotante(mensaje, "error");
     return;
   }
 
@@ -71,30 +77,43 @@ async function guardarActividadExtra() {
     return tag === texto || nombre === texto || texto.includes(tag);
   });
 
+  // Cuando un supervisor reporta su PROPIA actividad, no tiene
+  // sentido que quede pendiente de que el mismo supervisor la
+  // apruebe - queda aprobada directo, con los mismos campos que deja
+  // revisarActividadExtra() al aprobar algo.
+  const ahora = new Date().toISOString();
+  const payload = {
+    empresa_id: state.empresaId,
+    equipo_id: equipoRelacionado?.id || null,
+    equipo_texto: equipoTexto,
+    tipo: "extra",
+    descripcion,
+    hora_inicio: horaInicio || null,
+    hora_fin: horaFin || null,
+    horas_hombre: horasEntre(horaInicio, horaFin),
+    comentario,
+    status: esSupervisor ? "extra_aprobada" : "pendiente_revision",
+    fecha: new Date().toISOString().slice(0, 10),
+    hora: new Date().toTimeString().slice(0, 5),
+    usuario_id: user?.id || null,
+    usuario_nombre: user?.nombre || null,
+    usuario: user?.nombre || null,
+    usuario_rol: user?.rol || state.sessionRole,
+    evidencia_texto: evidenciaTexto || null,
+    evidencia_foto_nombre: fotoNombre,
+    evidencia_foto_tipo: fotoTipo,
+    evidencia_foto_data_url: fotoDataUrl
+  };
+  if (esSupervisor) {
+    payload.revision_status = "aprobado";
+    payload.revision_comentario = "Registrada directo por el supervisor.";
+    payload.revisado_por_nombre = user?.nombre || "Supervisor";
+    payload.revisado_at = ahora;
+  }
+
   const { error } = await sb
     .from(cfg.tables.actividades)
-    .insert({
-      empresa_id: state.empresaId,
-      equipo_id: equipoRelacionado?.id || null,
-      equipo_texto: equipoTexto,
-      tipo: "extra",
-      descripcion,
-      hora_inicio: horaInicio || null,
-      hora_fin: horaFin || null,
-      horas_hombre: horasEntre(horaInicio, horaFin),
-      comentario,
-      status: "pendiente_revision",
-      fecha: new Date().toISOString().slice(0, 10),
-      hora: new Date().toTimeString().slice(0, 5),
-      usuario_id: user?.id || null,
-      usuario_nombre: user?.nombre || null,
-      usuario: user?.nombre || null,
-      usuario_rol: user?.rol || state.sessionRole,
-      evidencia_texto: evidenciaTexto || null,
-      evidencia_foto_nombre: fotoNombre,
-      evidencia_foto_tipo: fotoTipo,
-      evidencia_foto_data_url: fotoDataUrl
-    });
+    .insert(payload);
 
   if (error) {
     setStatus(`Supabase no dejó guardar actividad extra: ${error.message}. Corre el Paso 11 si aún no lo has corrido.`, "warn");
@@ -103,8 +122,9 @@ async function guardarActividadExtra() {
   }
 
   await loadActividades();
+  state.extraFormSupervisorAbierto = false;
   renderModules();
-  mostrarAvisoFlotante("Actividad enviada a revisión.", "ok");
+  mostrarAvisoFlotante(esSupervisor ? "Actividad registrada y aprobada." : "Actividad enviada a revisión.", "ok");
   const form = $("extra-descripcion");
   if (form) {
     ["extra-descripcion", "extra-equipo", "extra-hora-inicio", "extra-hora-fin", "extra-comentario", "extra-evidencia"].forEach(campo => {

@@ -30,6 +30,7 @@ const state = {
   sessionRole: "SUPERVISOR",
   selectedUserId: "",
   actividadesLoading: false,
+  extraFormSupervisorAbierto: false,
   levantamiento: null,
   levantamientoPuntoNombre: "",
   fotos: [],
@@ -1428,9 +1429,12 @@ function renderModules() {
         view.querySelector(".module-panel").innerHTML = `
           <div class="module-wide">
             <p class="eyebrow">Actividades extra</p>
-            <h2>${isSupervisorMode() ? "Reportes desde campo" : "Reportar actividad extra"}</h2>
-            <p class="muted">${isSupervisorMode() ? "Aquí supervisor revisa los trabajos no programados subidos por campo. Toca uno para aprobarlo o rechazarlo." : `Panel de prueba para ${escapeHtml(user?.nombre || "técnico")}.`}</p>
-            ${isSupervisorMode() ? "" : `
+            <div class="panel-head compact-head">
+              <h2>${isSupervisorMode() ? "Reportes desde campo" : "Reportar actividad extra"}</h2>
+              ${isSupervisorMode() ? `<button type="button" class="ghost-action" onclick="toggleExtraFormSupervisor()">${state.extraFormSupervisorAbierto ? "✕ Cerrar" : "+ Reportar actividad propia"}</button>` : ""}
+            </div>
+            <p class="muted">${isSupervisorMode() ? "Aquí revisas los trabajos no programados subidos por campo, y también puedes reportar uno que hayas hecho tú mismo." : `Panel de prueba para ${escapeHtml(user?.nombre || "técnico")}.`}</p>
+            ${(!isSupervisorMode() || state.extraFormSupervisorAbierto) ? `
               <div class="form-preview">
                 <label>Qué actividad realizaste<textarea id="extra-descripcion" placeholder="Ej: Se corrigió fuga en chumacera, se ajustó guarda, se limpió área..."></textarea></label>
                 <label>Equipo o área<input id="extra-equipo" placeholder="Ej: BTR-5133 o Secador enfriador"></label>
@@ -1442,9 +1446,9 @@ function renderModules() {
                 <label>Evidencia o referencia<textarea id="extra-evidencia" placeholder="Folio, nota de evidencia, liga o referencia temporal..."></textarea></label>
                 <label>Adjuntar foto<input id="extra-foto" type="file" accept="image/*" onchange="previewExtraFoto(this)"></label>
                 <div id="extra-foto-preview"></div>
-                <div class="form-action"><button onclick="guardarActividadExtra()">Enviar</button></div>
+                <div class="form-action"><button onclick="guardarActividadExtra()">${isSupervisorMode() ? "Guardar (queda aprobada)" : "Enviar"}</button></div>
               </div>
-            `}
+            `: ""}
             <div class="panel-head compact-head">
               <h3>${isSupervisorMode() ? "Extras recientes" : "Mis extras recientes"}</h3>
               <span class="muted">${extrasVisibles.length} de ${totalExtrasVisibles} registros</span>
