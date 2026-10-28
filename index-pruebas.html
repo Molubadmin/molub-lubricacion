@@ -34,6 +34,7 @@
       <button class="nav" data-view="lubricantes">Lubricantes</button>
       <button class="nav" data-view="raci">Matriz RACI</button>
       <button class="nav" data-view="modulos">Módulos por empresa</button>
+      <button class="nav" data-view="usuarios">Administrar usuarios</button>
     </nav>
     <div class="session">
       <span>Acceso por rol</span>
@@ -229,6 +230,10 @@
         <div id="module-settings" class="module-settings"></div>
       </div>
     </section>
+
+    <section id="usuarios" class="view">
+      <div class="panel" id="usuarios-panel"></div>
+    </section>
   </main>
 
   <div id="modal-overlay" class="modal-overlay hidden" onclick="if(event.target===this) cerrarModal()">
@@ -239,14 +244,15 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
-  <script src="./raci.js?v=paso115-excel-horas-hombre"></script>
-  <script src="./lubricantes.js?v=paso115-excel-horas-hombre"></script>
-  <script src="./cartas.js?v=paso115-excel-horas-hombre"></script>
-  <script src="./equipos.js?v=paso115-excel-horas-hombre"></script>
-  <script src="./actividades-extra.js?v=paso115-excel-horas-hombre"></script>
-  <script src="./tareas.js?v=paso115-excel-horas-hombre"></script>
-  <script src="./horas.js?v=paso115-excel-horas-hombre"></script>
-  <script src="./actividades-programadas.js?v=paso115-excel-horas-hombre"></script>
-  <script src="./app.js?v=paso115-excel-horas-hombre"></script>
+  <script src="./raci.js?v=paso116-admin-usuarios"></script>
+  <script src="./lubricantes.js?v=paso116-admin-usuarios"></script>
+  <script src="./cartas.js?v=paso116-admin-usuarios"></script>
+  <script src="./equipos.js?v=paso116-admin-usuarios"></script>
+  <script src="./actividades-extra.js?v=paso116-admin-usuarios"></script>
+  <script src="./tareas.js?v=paso116-admin-usuarios"></script>
+  <script src="./horas.js?v=paso116-admin-usuarios"></script>
+  <script src="./actividades-programadas.js?v=paso116-admin-usuarios"></script>
+  <script src="./usuarios.js?v=paso116-admin-usuarios"></script>
+  <script src="./app.js?v=paso116-admin-usuarios"></script>
 </body>
 </html>

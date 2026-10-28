@@ -31,6 +31,10 @@ const state = {
   selectedUserId: "",
   actividadesLoading: false,
   extraFormSupervisorAbierto: false,
+  usuariosAdmin: [],
+  usuariosFormAbierto: false,
+  usuariosAdminCargando: false,
+  usuariosAdminCargado: false,
   levantamiento: null,
   levantamientoPuntoNombre: "",
   fotos: [],
@@ -270,6 +274,13 @@ function esRevisorMolub() {
 }
 
 function roleAllowsView(view) {
+  if (view === "usuarios") {
+    // Crear/editar cuentas y roles solo lo debe poder hacer Admin
+    // MOLUB - igual que "modulos", en modo de prueba sin sesion real
+    // se deja pasar para no estorbar pruebas internas.
+    if (!state.authUser) return isSupervisorMode();
+    return esAdminMolub();
+  }
   if (view === "modulos") {
     // Activar/desactivar modulos de una empresa es una decision de
     // MOLUB, no de la empresa cliente - un supervisor normal (ej. el
@@ -1216,6 +1227,11 @@ function renderModules() {
     </div>
   `).join("");
 
+  if (esAdminMolub() && state.view === "usuarios" && !state.usuariosAdminCargado && !state.usuariosAdminCargando) {
+    loadUsuariosAdmin();
+  }
+  if ($("usuarios-panel")) $("usuarios-panel").innerHTML = renderUsuariosAdminPanel();
+
   document.querySelectorAll(".module-view").forEach(view => {
     const id = view.dataset.module;
     const module = MODULES.find(m => m.id === id);
@@ -1936,6 +1952,8 @@ $("empresa-select").addEventListener("change", async (event) => {
   state.empresaId = event.target.value;
   resetearVistasDeDetalle();
   state.selectedUserId = "";
+  state.usuariosAdminCargado = false;
+  state.usuariosFormAbierto = false;
   if (state.authPerfiles && state.authPerfiles.length) {
     // Un comisionista puede tener un rol distinto guardado por cada
     // empresa (aunque hoy sea siempre el mismo); al cambiar de
